@@ -120,9 +120,9 @@ if ($is_aug==0) {
 say STDERR "Done reading ref fasta $REF_SEQS_STAT";
 
 my $VCF_APPEND = <<'EOF';
-##INFO=<ID=ZORIPOS,Number=1,Type=Integer,Description="ZORIPOS">
-##INFO=<ID=ZORIEND,Number=1,Type=Integer,Description="ZORIEND">
-##INFO=<ID=ZLEN,Number=1,Type=Integer,Description="ZLEN">
+##INFO=<ID=ZORIPOS,Number=1,Type=Integer,Description="original start position before Realign of Variant">
+##INFO=<ID=ZORIEND,Number=1,Type=Integer,Description="original end position before Realign of Variant">
+##INFO=<ID=ZLEN,Number=1,Type=Integer,Description="original length before Realign of Variant">
 EOF
 
 my $vcf_header = &read_vcf_header($I_VCF, $O_VCF, $VCF_APPEND);
