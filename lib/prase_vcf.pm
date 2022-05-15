@@ -23,7 +23,6 @@ use v5.24;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
-use Bio::SeqIO;
 use zzIO;
 use List::Util qw/max min/;
 use Carp qw/confess carp/; # carp=warn;confess=die
@@ -93,19 +92,6 @@ sub read_ref {
     return (\%ret, $stat);
 }
 
-
-sub read_ref_bioperl {
-    my ($in) = @_;
-    my %ret;
-    my $I = open_in_fh($in);
-    my $fa_obj=Bio::SeqIO->new(-fh=>$I,-format=>'fasta');
-    while(my $seq_obj=$fa_obj->next_seq){
-        my $chr_now=$seq_obj->id;
-        my $seq=$seq_obj->seq;
-        $ret{$chr_now} = $seq;
-    }
-    return \%ret;
-}
 
 
 sub read_vcf_header {
