@@ -1,4 +1,5 @@
 #################### I/O File paths ####################
+## Absolute paths are recommended instead of relative paths
 # workdir: Dir contains sample_read.list and will store result files.
 workdir: "example"
 #sample_reads_list_file: File name of sample_read.list. Must located in wirkdir
@@ -18,7 +19,7 @@ mafft: ""
 
 
 #################### Filter Parameters ####################
-# minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5
+# MAP_MINQ: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5
 MAP_MINQ: 5
 # MAF: Remove alleles than lower than this value. This is necessary and will greatly reduce the complexity of SVs. Default is 0.01
 MAF: 0.01

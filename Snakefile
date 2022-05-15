@@ -8,16 +8,14 @@ MAPPER=config['mapper']
 BCFTOOLS = os.path.abspath(config['bcftools'])
 vg = os.path.abspath(config["vg"])
 tabix = os.path.abspath(config["tabix"])
-
-
 zworkdir = config['workdir']
 ztmpdir = 'tmp'
-
 
 workdir: zworkdir
 
 include: "subworkflows/callSV.py"
 SAMPLES = list_prepaire_files(config['sample_reads_list_file'])
+
 rule all:
     input:
         '5.final_result/2.final.sv.vcf.gz'
