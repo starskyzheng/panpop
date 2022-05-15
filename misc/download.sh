@@ -7,5 +7,8 @@ wget 'https://github.com/StarSkyZheng/bcftools/releases/download/mod_merge/bcfto
 # vg software
 wget 'https://github.com/vgteam/vg/releases/download/v1.36.0/vg'
 
+# minigraph
+wget 'https://github.com/lh3/minigraph/releases/download/v0.18/minigraph-0.18.tar.bz2'
+
 # tabix
 

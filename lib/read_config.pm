@@ -57,18 +57,19 @@ sub read_config_yaml {
     foreach my $key (keys %$config) {
         delete $config->{$key} if ref($config->{$key}) eq '' and $config->{$key} eq '';
     }
-    foreach my $bin (qw/stmsa bcftools vg tabix muscle3 mafft/) {
+    foreach my $bin (qw/stmsa bcftools vg tabix muscle3 mafft minigraph/) {
         my $path = $config->{$bin};
         next unless defined $path and $path ne '';
         my $bin_path_new = "$Bin/../$path";
-        if (-e $path) {
+        if (-e $path and -x $path) {
             $config->{$bin} = File::Spec->rel2abs($path);
             next;
-        } elsif (-e $bin_path_new) {
+        }
+        if (-e $bin_path_new and -x $bin_path_new) {
             $config->{$bin} = File::Spec->rel2abs($bin_path_new);
             next;
         } else {
-            die "Error: $bin not found in $path or $bin_path_new\n";
+            die "Error: $bin not found in $path or $bin_path_new or is not excutable\n";
         }
     }
     return $config;

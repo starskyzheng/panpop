@@ -1,32 +1,44 @@
-# PanPop
+# <a name="intro"></a>PanPop
+
   Application of pan-genome to population based on resequnces 
 
-# Usage
+
+
+- [Usage](#Usage)
+  - [Example](#example)
+- [Users' Guide](#uguide)
+  - [Installation](#install)
+  - [Parameters](#parameters)
+  - [Notice](#notice)
+- [Citations](#cite)
+
+## <a name="usage"></a>Usage
   A graph-based genome in GFA format and resequnce reads were needed. 
   Reference gfa should be renamed as Ref.gfa.
   Created a list file contains paired-end seq reads (like example/1.sample.reads.list).
   Modify `workdir` and `sample_reads_list_file` in config.yaml.
   You are ready to go!
-## example:
+### <a name="example"></a>Example:
     git clone https://github.com/StarSkyZheng/panpop.git
     cd panpop
     snakemake -j 3 --reason --printshellcmds
   Results located in `example/5.final_result`
  
-# Install:
+## <a name="install"></a>Install:
   Dependencies: python3 & perl>=5.24   
-    `pip install snakemake`  
-    `cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp`  
+
+    pip install snakemake  
+    cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
   
   
-# Parameters:
+## <a name="parameters"></a>Parameters:
 All parameters were defined in `config.yaml` file  
-### I/O File paths
+#### I/O File paths
 `workdir`: Dir contains sample_read.list and will store result files.
 
 `sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir
 
-### Filter Parameters:
+#### Filter Parameters:
   `MAP_MINQ`: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5  
 
   `MAF`: Remove alleles than lower than this value. This is necessary and will greatly reduce the complexity of SVs. Default is 0.01  
@@ -37,21 +49,24 @@ All parameters were defined in `config.yaml` file
 
   `mad_min_fold`: Hard-filter based on depth: Min MAD(Minimum site allele depth) for each site is XX fold of mean depth of this sample. Default is 1/3 * 1/3  
 
-### Realign Parameters:
+#### Realign Parameters:
   `realign_extend_bp_max` & `realign_extend_bp_min`: During realign progress, the near by SNP/SVs will be merged together before realign. Values that are too low or too large may lose some accuracy. Default is 10 and 1.  
 
-### More parameters
+#### More parameters
   `SV_min_length`: Minimal length for SVs. Variat more than one base and smaller than this value will treated as InDels. Default is 50.  
   
   `realign_max_try_times_per_method`: Max try-times of each align software. Default is 3.  
 
   `memory_tmp_dir`: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
 
-## Notice
+## <a name=notice></a>Notice
+  Graph-genome should be rgfa ()
+  The name of chromosome will be specified.
   Chromesome name cannot be `all`.
+  Backbone genome should be numeric only.
+  Non-Backbone genome should NOT be numeric only.
 
-
-## Citations
+## <a name=cite></a>Citations
 - [1] Shixiang Wan and Quan Zou, HAlign-II: efficient ultra-large multiple sequence alignment and phylogenetic tree reconstruction with distributed and parallel computing, Algorithms for Molecular Biology, 2017, 12:25.
 - [2] Danecek P, Bonfield JK, et al. Twelve years of SAMtools and BCFtools. Gigascience (2021) 10(2):giab008.
 - [3] Hickey, G., Heller, D., Monlong, J. et al. Genotyping structural variants in pangenome graphs using the vg toolkit. Genome Biol 21, 35 (2020).

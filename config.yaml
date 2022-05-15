@@ -1,6 +1,6 @@
 
 #################### Basic Parameters ####################
-## Absolute paths are recommended instead of relative paths
+## Absolute paths are recommended for workdir and sample_reads_list_file
 # workdir: Dir contains sample_read.list and will store result files.
 workdir: "example"
 # sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
@@ -23,7 +23,8 @@ tabix: "misc/tabix"
 # Optional but recommanded:
 muscle3: "misc/muscle"
 mafft: ""
-
+# Only for build_graph.pl
+minigraph: "misc/minigraph"
 
 #################### Filter Parameters ####################
 # MAP_MINQ: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5.
