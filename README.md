@@ -18,17 +18,19 @@
   Modify `workdir` and `sample_reads_list_file` in config.yaml.
   You are ready to go!
 ### <a name="example"></a>Example:
-    git clone https://github.com/StarSkyZheng/panpop.git
-    cd panpop
-    snakemake -j 3 --reason --printshellcmds
+```sh
+git clone https://github.com/StarSkyZheng/panpop.git
+cd panpop
+snakemake -j 3 --reason --printshellcmds
+```
   Results located in `example/5.final_result` or `example/9.aug_final_result` for augment mode.
  
 ## <a name="install"></a>Install:
   Dependencies: python3 & perl>=5.24   
-
-    pip install snakemake  
-    cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
-
+```sh
+pip install snakemake  
+cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
+```
 
 ## <a name="parameters"></a>Parameters:
 All parameters were defined in `config.yaml` file  
