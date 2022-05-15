@@ -127,7 +127,7 @@ rule map_gaffe:
         mem_mb=config['mem_map']
     log: '2.callSV/logs/' + map_lab + '-{genome}-gaffe.log.txt'
     run:
-        shell("{vg} giraffe --sample {wildcards.sample} -Z {input.gbz} -m {input.min} -d {input.dist} -f {input.r1} -f {input.r2} > {output} 2>> {log}")
+        shell("{vg} giraffe --sample {wildcards.sample} -Z {input.gbz} -m {input.min} -d {input.dist} -f {input.r1} -f {input.r2} -t {threads} > {output} 2>> {log}")
 
 rule map_GraphAligner:
     input:

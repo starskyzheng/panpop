@@ -11,7 +11,7 @@ tabix = os.path.abspath(config["tabix"])
 
 
 zworkdir = config['workdir']
-ztmpdir = config['workdir'] + '/tmp'
+ztmpdir = 'tmp'
 
 
 workdir: zworkdir
@@ -26,8 +26,17 @@ for dir in [ztmpdir, '2.callSV', '3.merge_rawvcf', '4.realign', '5.final_result'
     if not os.path.exists(dir):
         os.makedirs(dir)
 
+rule cleanall:
+    params:
+        rmfiles=expand('{graph}.{ext}', graph=GRAPH, ext=['xg', 'snarls', 'gcsa', 'gcsa.lcp', 'ids.mapping', 'dist', 'trivial.snarls', 'gfa.fa', 'min', 'snarls', 'giraffe.gbz']) +
+        ["2.callSV", "3.merge_rawvcf", "4.realign", "5.final_result", ztmpdir] +
+        ["2.callSV.DPinfos.txt"] +
+        ["logs"]
+    shell:
+        "rm -rf {params.rmfiles}"
+
 # call variants in the graph
-rule call:
+rule callSV:
     input: 
         expand('2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ),
         expand('2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz.tbi', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ),
@@ -65,7 +74,6 @@ rule merge_dp2_infos:
 
 
 # merge raw vcfs
-
 rule merge_rawvcfs_gen_list:
     input:
         vcfs = expand('2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ),
@@ -121,6 +129,7 @@ rule filter_raw_vcf:
         perl {workflow.basedir}/scripts/flt_raw_vcfs.pl --invcf {input.vcf} --outvcf {output.vcf} --miss_threshold 1 --threads {threads} --dp_min_fold {params.dp_min_fold} --dp_max_fold {params.dp_max_fold} --mad_min_fold {params.mad_min_fold} --depth_file {input.depthfile} > {log} 2>&1
         """
 
+# Realign
 rule realign1:
     input:
         vcf = '3.merge_rawvcf/4.filter_raw_vcf.vcf.gz',
@@ -133,7 +142,7 @@ rule realign1:
         'logs/4.1.realign1.vcf.gz.log'
     threads: config['core_realign']
     resources:
-        mem_mb=config['core_realign']
+        mem_mb=config['mem_realign']
     params:
         realign_extend_bp_max = config['realign_extend_bp_max'],
         realign_extend_bp_min = config['realign_extend_bp_min'],
@@ -172,7 +181,7 @@ rule realign2:
         'logs/4.3.realign1.vcf.gz.log'
     threads: config['core_realign']
     resources:
-        mem_mb=config['core_realign']
+        mem_mb=config['mem_realign']
     params:
         realign_extend_bp_max = config['realign_extend_bp_max'],
         realign_extend_bp_min = config['realign_extend_bp_min'],
@@ -198,7 +207,7 @@ rule filter_maf2:
         """perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} > {log} 2>&1
         """
 
-
+# Finally
 rule split_vcf_by_type:
     input:
         vcf = '4.realign/4.filter_maf1.vcf.gz'

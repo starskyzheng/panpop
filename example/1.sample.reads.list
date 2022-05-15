@@ -1,2 +1,4 @@
-a /data/00/user/user101/software/panpop/example/r1.fq.gz /data/00/user/user101/software/panpop/example/r2.fq.gz
-ab /data/00/user/user101/software/panpop/example/r1.fq.gz /data/00/user/user101/software/panpop/example/r2.fq.gz
+##### Absolute paths are recommended instead of relative paths
+# sampleid read1_path read2_path
+s1 r1.fq.gz r2.fq.gz
+s2 r1.fq.gz r2.fq.gz
