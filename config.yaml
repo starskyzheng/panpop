@@ -50,6 +50,15 @@ mapper: 'gaffe'
 
 
 #################### Resource ####################
+# cores used in multi-threaded steps
+core_realign: 10
+cores_xg: 20
+cores_snarls: 10
+cores_map: 20
+cores_pack: 10
+cores_call: 10
+cores_augment: 5
+cores_avgdp: 6
 # for minimizer/gaffe mapper
 mem_xg: 60000
 mem_snarls: 120000
@@ -60,13 +69,5 @@ mem_pgconvert: 60000
 mem_augment: 70000
 mem_avgdp: 20000
 mem_realign: 20000
-# cores used in multi-threaded steps
-core_realign: 10
-cores_xg: 20
-cores_snarls: 10
-cores_map: 20
-cores_pack: 10
-cores_call: 10
-cores_augment: 5
-cores_avgdp: 6
+
 
