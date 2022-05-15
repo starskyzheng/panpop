@@ -35,6 +35,7 @@ options:
 The name of chromosome will be specified.
 Backbone genome should be numeric only.
 Non-Backbone genome should NOT be numeric only.
+For example: perl $0 -b $Bin/../example/build_graph.example/MT-human.fa -o $Bin/../example/build_graph.example/out -t 2 $Bin/../example/build_graph.example/MT-chimp.fa $Bin/../example/build_graph.example/MT-orangA.fa
 EOF
     exit(1);
 }
