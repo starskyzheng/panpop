@@ -120,7 +120,7 @@ rule realign1:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  > {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ztmpdir}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 rule filter_maf1:
@@ -159,7 +159,7 @@ rule realign2:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  > {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ztmpdir}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
         """
 
 rule filter_maf2:

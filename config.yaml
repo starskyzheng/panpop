@@ -6,9 +6,9 @@ workdir: "example"
 # sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
 sample_reads_list_file: "1.sample.reads.list"
 # split_chr: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
-split_chr: True
+split_chr: False
 # mode: (genotype or augment). `genotype` mode will genotype SVs in the graph-genome. `augment` mode will extract novel SNPs and SVs for each sample. Default is `genotype`.
-mode: "augment"
+mode: "genotype"
 # Graph-based reference should be renamed as `Ref.gfa` and then placed in `workdir`. This value is not recommand for modifing! Default is `Ref`.
 graph: 'Ref'
 

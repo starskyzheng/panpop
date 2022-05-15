@@ -6,12 +6,12 @@ include: "subworkflows/util.py"
 GRAPH=config['graph']
 MAPPER=config['mapper']
 BCFTOOLS = os.path.abspath(config['bcftools'])
-vg = os.path.abspath(config["vg"])
-tabix = os.path.abspath(config["tabix"])
-zworkdir = config['workdir']
-ztmpdir = 'tmp'
+VG = os.path.abspath(config["vg"])
+TABIX = os.path.abspath(config["tabix"])
+ZWORKDIR = config['workdir']
+ZTMPDIR = 'tmp'
 
-workdir: zworkdir
+workdir: ZWORKDIR
 
 include: "subworkflows/callSV.py"
 
@@ -51,7 +51,7 @@ include: "subworkflows/panpopaug.py"
 
 
 
-for dir in [ztmpdir]:
+for dir in [ZTMPDIR]:
     if not os.path.exists(dir):
         os.makedirs(dir)
 
@@ -59,7 +59,7 @@ for dir in [ztmpdir]:
 rule cleanall:
     params:
         rmfiles=expand('{graph}.{ext}', graph=GRAPH, ext=['xg', 'snarls', 'gcsa', 'gcsa.lcp', 'ids.mapping', 'dist', 'trivial.snarls', 'gfa.fa', 'min', 'snarls', 'giraffe.gbz', 'pg']) +
-        [ztmpdir] +
+        [ZTMPDIR] +
         ["2.callSV", "3.merge_rawvcf", "4.realign", "5.final_result" ] +
         ["6.aug_dp", "7.aug_merge_rawvcf", "8.aug_realign", "9.aug_final_result"] +
         ["2.callSV.DPinfos.txt"] +

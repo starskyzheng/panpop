@@ -62,8 +62,8 @@ rule merge_dp_vcf:
     shell:
         """
         perl {workflow.basedir}/scripts/cal_range_depth_aug.fillvcf.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref {input.ref} --min_dp {params.min_dp} --min_cov {params.min_cov} --chr {wildcards.chrm} --dp_file {input.dpfile} > {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ztmpdir}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
-        {tabix} {output.vcf_sorted}
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        {TABIX} {output.vcf_sorted}
         """
 
 
@@ -144,7 +144,7 @@ rule aug_realign1:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  > {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ztmpdir}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 rule aug_filter_maf1:
@@ -183,7 +183,7 @@ rule aug_realign2:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  > {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ztmpdir}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
         """
 
 rule aug_filter_maf2:
