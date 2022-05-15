@@ -24,7 +24,7 @@ All parameters were defined in `config.yaml` file
 ### I/O File paths
 `workdir`: Dir contains sample_read.list and will store result files.
 
-`sample_reads_list_file`: File name of sample_read.list. Must be located in wirkdir
+`sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir
 
 ### Filter Parameters:
   `MAP_MINQ`: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5  
