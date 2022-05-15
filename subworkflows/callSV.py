@@ -40,15 +40,11 @@ def list_prepaire_files(file):
 ## Config
 ##
 
-
-# config values used a lot directly within shell commands
-#GRAPH=config['graph']
-GRAPH='Ref'
 # parse config values
+GRAPH=config['graph']
 MAPPER=config['mapper']
 
-
-MINQ=5
+MINQ=config['MAP_MINQ']
 if MAPPER=='GraphAligner': MINQ=0
 
 # BASEDIR is '2.callSV'
@@ -94,7 +90,7 @@ rule map:
         mem_mb=config['mem_map']
     log: '2.callSV/logs/' + map_lab + '-{genome}-map.log.txt'
     run:
-        shell("{vg} map -t {threads} -x {input.xg} -g {input.gcsa} -f {input.r1} -f {input.r2} > {output} 2>> {log}")
+        shell("{VG} map -t {threads} -x {input.xg} -g {input.gcsa} -f {input.r1} -f {input.r2} > {output} 2>> {log}")
 
 # map reads to the graph using mpmap in single-path mode
 rule map_mpmap:
@@ -110,7 +106,7 @@ rule map_mpmap:
         mem_mb=config['mem_map']
     log: '2.callSV/logs/' + map_lab + '-{genome}-mpmap.log.txt'
     run:
-        shell("{vg} mpmap -S -t {threads} -x {input.xg} -g {input.gcsa} -f {input.r1} -f {input.r2} > {output} 2>> {log}")
+        shell("{VG} mpmap -S -t {threads} -x {input.xg} -g {input.gcsa} -f {input.r1} -f {input.r2} > {output} 2>> {log}")
 
 # map reads to the graph using giraffe
 rule map_gaffe:
@@ -127,7 +123,7 @@ rule map_gaffe:
         mem_mb=config['mem_map']
     log: '2.callSV/logs/' + map_lab + '-{genome}-gaffe.log.txt'
     run:
-        shell("{vg} giraffe --sample {wildcards.sample} -Z {input.gbz} -m {input.min} -d {input.dist} -f {input.r1} -f {input.r2} -t {threads} > {output} 2>> {log}")
+        shell("{VG} giraffe --sample {wildcards.sample} -Z {input.gbz} -m {input.min} -d {input.dist} -f {input.r1} -f {input.r2} -t {threads} > {output} 2>> {log}")
 
 rule map_GraphAligner:
     input:
@@ -154,7 +150,7 @@ rule pack:
         mem_mb=config['mem_pack']
     log: '2.callSV/logs/{sample}-{graph}-{map}-q{minq}-pack.log.txt'
     run:
-        shell("{vg} pack -x {input.xg} -g {input.gam} -Q {wildcards.minq} -t {threads} -o {output} 2>> {log}")
+        shell("{VG} pack -x {input.xg} -g {input.gam} -Q {wildcards.minq} -t {threads} -o {output} 2>> {log}")
 
 
 # cal avg depth of gam
@@ -169,7 +165,7 @@ rule cal_avg_depth:
     resources:
         mem_mb=config['mem_avgdp']
     run:
-        shell("{vg} depth --threads 4 -g {input.gam} {input.xg} > {output.avgdp} 2>> {log}")
+        shell("{VG} depth --threads 4 -g {input.gam} {input.xg} > {output.avgdp} 2>> {log}")
 
 rule cal_avg_depth2:
     input:
@@ -198,10 +194,10 @@ rule call_novcf:
         mem_mb=config['mem_call']
     log: '2.callSV/logs/{sample}-{graph}-{map}-q{minq}-call.log.txt'
     run:
-        shell("{vg} call -k {input.pack} -t {threads} -s {wildcards.sample} --genotype-snarls --snarls {input.snarls} {input.xg} 2>> {log} | {BCFTOOLS} sort 2>> {log} | bgzip --threads {threads} > {output.vcf_ext}")
-        shell("{tabix} -f -p vcf {output.vcf_ext}")
+        shell("{VG} call -k {input.pack} -t {threads} -s {wildcards.sample} --genotype-snarls --snarls {input.snarls} {input.xg} 2>> {log} | {BCFTOOLS} sort 2>> {log} | bgzip --threads {threads} > {output.vcf_ext}")
+        shell("{TABIX} -f -p vcf {output.vcf_ext}")
         shell("{BCFTOOLS} view -e 'GT=\"0/0\" || GT=\"./.\"' {output.vcf_ext} | {BCFTOOLS} filter -i 'FILTER==\"PASS\"' | bgzip --threads {threads} > {output.vcf}")
-        shell("{tabix} -f -p vcf {output.vcf}")
+        shell("{TABIX} -f -p vcf {output.vcf}")
 
 
 #
@@ -217,7 +213,7 @@ rule pgconvert:
         mem_mb=config['mem_pgconvert']
     log: '2.callSV/logs/{graph}-pgconvert.log.txt'
     run:
-        shell('{vg} convert {input} -p > {output} 2>> {log}')
+        shell('{VG} convert {input} -p > {output} 2>> {log}')
 
 # augment a graph with aligned reads
 rule augment:
@@ -232,7 +228,7 @@ rule augment:
         mem_mb=config['mem_augment']
     log: '2.callSV/logs/{sample}-{graph}-{map}-augment.log.txt'             
     run:
-        shell('{vg} augment {input.pg} {input.gam} -t {threads} -m 4 -q 5 -Q 5 -A {output.gam} > {output.pg} 2>> {log}')
+        shell('{VG} augment {input.pg} {input.gam} -t {threads} -m 4 -q 5 -Q 5 -A {output.gam} > {output.pg} 2>> {log}')
 
 # cal avg depth of gam
 rule cal_avg_depth_aug:
@@ -244,7 +240,7 @@ rule cal_avg_depth_aug:
     log: '2.callSV/logs/{sample}-{graph}-{map}-aug-avgdp.log.txt'
     threads: config['cores_avgdp']
     run:
-        shell("{vg} depth -g {input.gam} {input.xg} > {output.avgdp} 2>> {log}")
+        shell("{VG} depth -g {input.gam} {input.xg} > {output.avgdp} 2>> {log}")
 
 rule cal_avg_depth_aug2:
     input:
@@ -268,7 +264,7 @@ rule index_snarls_aug:
         mem_mb=config['mem_snarls']
     log: '2.callSV/logs/{sample}-{graph}-{map}-aug-snarls.log.txt'
     run:
-        shell('{vg} snarls -t {threads} {input} > {output} 2>> {log}')
+        shell('{VG} snarls -t {threads} {input} > {output} 2>> {log}')
 
 # compute packed coverage on augmented graph
 rule pack_aug:
@@ -281,7 +277,7 @@ rule pack_aug:
         mem_mb=config['mem_pack']   
     log: '2.callSV/logs/{sample}-{graph}-{map}-aug-q{minq}-pack.log.txt'
     run:
-        shell("{vg} pack -x {input.pg} -g {input.gam} -Q {wildcards.minq} -t {threads} -o {output} 2>> {log}")
+        shell("{VG} pack -x {input.pg} -g {input.gam} -Q {wildcards.minq} -t {threads} -o {output} 2>> {log}")
 
 
 # call variants from the packed read coverage
@@ -299,8 +295,8 @@ rule call_aug:
         mem_mb=config['mem_call']
     log: '2.callSV/logs/{sample}-{graph}-{map}-aug-q{minq}-call.log.txt'
     run:
-        shell("{vg} call -k {input.pack} -t {threads} -s {wildcards.sample} --snarls {input.snarls} {input.pg}  2>> {log} | {BCFTOOLS} sort 2>> {log} | bgzip --threads {threads} > {output.vcf_ext}")
-        shell("{tabix} -f -p vcf {output.vcf_ext}")
+        shell("{VG} call -k {input.pack} -t {threads} -s {wildcards.sample} --snarls {input.snarls} {input.pg}  2>> {log} | {BCFTOOLS} sort 2>> {log} | bgzip --threads {threads} > {output.vcf_ext}")
+        shell("{TABIX} -f -p vcf {output.vcf_ext}")
         shell("{BCFTOOLS} view -e 'GT=\"0/0\" || GT=\"./.\"' {output.vcf_ext} | {BCFTOOLS} filter -i 'FILTER==\"PASS\"' | bgzip --threads {threads} > {output.vcf}")
-        shell("{tabix} -f -p vcf {output.vcf}")
+        shell("{TABIX} -f -p vcf {output.vcf}")
 

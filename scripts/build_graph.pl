@@ -1,0 +1,143 @@
+#!/usr/bin/env perl
+use v5.10;
+use warnings;
+use strict;
+use File::Basename;
+
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+
+use zzIO;
+use Getopt::Long;
+use read_config qw/read_config_yaml/;
+
+my $config = read_config_yaml("$Bin/../config.yaml");
+
+my $vg = $$config{vg} or die "vg not defined in config file!";
+my $minigraph = $$config{minigraph} or die "minigraph not defined in config file!";
+
+
+my ($backbone, $outdir, $opt_help);
+
+my $threads = 24;
+
+sub usage {
+    my $msg = shift;
+    print STDERR "$msg\n" if $msg;
+    print STDERR <<"EOF";
+USAGE: perl $0 [options] [genomes]
+options:
+    -b | --backbone <file>         Backbone genome file (in fasta)
+    -o | --out_dir <file>          Output dir
+    -t | --threads <int>           Number of threads (default: $threads)
+    -h | --help                    Print this help
+
+The name of chromosome will be specified.
+Backbone genome should be numeric only.
+Non-Backbone genome should NOT be numeric only.
+EOF
+    exit(1);
+}
+
+
+GetOptions (
+        'h|help!' => \$opt_help,
+        'b|backbone=s' => \$backbone,
+        'o|out_dir=s' => \$outdir,
+        't|threads=i' => \$threads,
+);
+
+my @moregenomes = @ARGV;
+
+&usage() unless $outdir and $backbone and @moregenomes;
+
+&check_backbone($backbone);
+&check_dup_chrs($backbone, @moregenomes);
+
+if (! -e $outdir) {
+    mkdir $outdir or die "$outdir can not be created";
+}
+
+my $gfa1 = "$outdir/1.original.gfa";
+
+my $cmd_build = "$minigraph --inv no -xggs -L 10 -K 4G -t $threads $backbone > $gfa1";
+
+say STDERR "Now start build graph, command is:";
+say STDERR $cmd_build;
+system($cmd_build);
+
+my $cmd_gfa2vg = "$vg autoindex -w map -p $outdir/2.vg -g $gfa1";
+say STDERR "Now covert gfa to vg, command is:";
+say STDERR $cmd_gfa2vg;
+system($cmd_gfa2vg);
+
+my $xg = "$outdir/2.vg.xg";
+my $gfa2 = "$outdir/2.vg.gfa";
+my $gfa3 = "$outdir/3.final.gfa";
+
+say STDERR "Now covert vg to gfa";
+my $cmd_vg2gfa = "$vg view $xg > $gfa2";
+system($cmd_vg2gfa);
+
+say STDERR "Now modify gfa";
+&mod_vg_gfa($gfa2, $gfa3);
+
+say STDERR "===========================";
+say STDERR "===========================";
+say STDERR "===========================";
+say STDERR "Done. final gfa file is $gfa3";
+exit;
+
+sub mod_vg_gfa {
+    my ($in, $out) = @_;
+    my $I = open_in_fh($in);
+    my $O = open_out_fh($out);
+    while(<$I>) {
+        if (/^P/) {
+            /^P\t(\S+)\t/ or die;
+            my $chr = $1;
+            print $O $_ if $chr=~/^\d+$/;
+        } else {
+            print $O $_;
+            next;
+        }
+    }
+}
+
+sub check_backbone {
+    my ($infa) = @_;
+    my $I = open_in_fh($infa);
+    while(<$I>) {
+        chomp;
+        next unless $_;
+        next unless /^>/;
+        /^>(\S+)/ or die "Chromosome of Backbone error!";
+        my $chr = $1;
+        $chr=~/^\d+$/ or die "Chromosome of Backbone should be numeric only! : $_";
+        $chr=~/^0/ and die "Chromosome of Backbone should not start with 0! : $_";
+    }
+}
+
+sub check_dup_chrs {
+    my ($backbone, @moregenomes) = @_;
+    my %chrs;
+    foreach my $fa ($backbone, @moregenomes) {
+        my $I = open_in_fh($fa);
+        while(<$I>) {
+            chomp;
+            next unless $_;
+            next unless /^>/;
+            /^>(\S+)/ or die "Chromosome name error for $fa line $. : $_";
+            my $chr = $1;
+            my $isint = $chr=~/^\d+$/;
+            if ($isint==1 and $fa ne $backbone) {
+                die "Chromosome name of none-backbone genome should NOT be numeric only";
+            }
+            if (exists $chrs{$chr}) {
+                die "Dumplicated chromosome name! $fa : $chr";
+            }
+            $chrs{$chr}++;
+        }
+    }
+}
+

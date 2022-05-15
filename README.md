@@ -1,32 +1,48 @@
-# PanPop
+# <a name="intro"></a>PanPop
+
   Application of pan-genome to population based on resequnces 
 
-# Usage
+
+
+- [Usage](#Usage)
+  - [Quick Start](#example)
+  - [Installation](#install)
+  - [Parameters](#parameters)
+  - [Notice](#notice)
+- [Citations](#cite)
+
+## <a name="usage"></a>Usage
   A graph-based genome in GFA format and resequnce reads were needed. 
   Reference gfa should be renamed as Ref.gfa.
   Created a list file contains paired-end seq reads (like example/1.sample.reads.list).
   Modify `workdir` and `sample_reads_list_file` in config.yaml.
   You are ready to go!
-## example:
+### <a name="example"></a>Example:
     git clone https://github.com/StarSkyZheng/panpop.git
     cd panpop
     snakemake -j 3 --reason --printshellcmds
-  Results located in `example/5.final_result`
+  Results located in `example/5.final_result` or `example/9.aug_final_result` for augment mode.
  
-# Install:
+## <a name="install"></a>Install:
   Dependencies: python3 & perl>=5.24   
-    `pip install snakemake`  
-    `cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp`  
-  
-  
-# Parameters:
+
+    pip install snakemake  
+    cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
+
+
+## <a name="parameters"></a>Parameters:
 All parameters were defined in `config.yaml` file  
-### I/O File paths
-`workdir`: Dir contains sample_read.list and will store result files.
+#### Basic Parameters
+  `workdir`: Dir contains sample_read.list and will store result files.
 
-`sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir
+  `sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir
 
-### Filter Parameters:
+  `split_chr`: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
+
+  `mode`: (genotype or augment). `genotype` mode will genotype SVs in the graph-genome. `augment` mode will extract novel SNPs and SVs for each sample. Default is `genotype`.
+
+
+#### Filter Parameters:
   `MAP_MINQ`: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5  
 
   `MAF`: Remove alleles than lower than this value. This is necessary and will greatly reduce the complexity of SVs. Default is 0.01  
@@ -37,22 +53,35 @@ All parameters were defined in `config.yaml` file
 
   `mad_min_fold`: Hard-filter based on depth: Min MAD(Minimum site allele depth) for each site is XX fold of mean depth of this sample. Default is 1/3 * 1/3  
 
-### Realign Parameters:
+#### Realign Parameters:
   `realign_extend_bp_max` & `realign_extend_bp_min`: During realign progress, the near by SNP/SVs will be merged together before realign. Values that are too low or too large may lose some accuracy. Default is 10 and 1.  
 
-### More parameters
+#### More parameters
   `SV_min_length`: Minimal length for SVs. Variat more than one base and smaller than this value will treated as InDels. Default is 50.  
-  
+
   `realign_max_try_times_per_method`: Max try-times of each align software. Default is 3.  
 
   `memory_tmp_dir`: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
 
+  `mapper`: Maping algorithm. Can be either 'map' or 'gaffe'
 
+  `aug_nonmut_min_cov`: In augment mode, if the coverage of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Defalut is 0.8.
 
-## Citations
+  `aug_nomut_min_dp`: In augment mode, if the average of depth of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Default is 3.
+
+## <a name=notice></a>Notice
+  Graph-genome should be [rGFA format][rgfa] and the name of chromosome must be specified.  
+  Chromesome name cannot be `all`.  
+  Backbone genome should be numeric only. Non-Backbone genome should NOT be numeric only.  
+  `scripts/build_graph.pl` can be used to build suitable gfa format from genome fasta files.   
+
+## <a name=cite></a>Citations
+  This software used `HAlign`, `bcftools`, `vg`, `muscle` and `snakemake` software: 
 - [1] Shixiang Wan and Quan Zou, HAlign-II: efficient ultra-large multiple sequence alignment and phylogenetic tree reconstruction with distributed and parallel computing, Algorithms for Molecular Biology, 2017, 12:25.
 - [2] Danecek P, Bonfield JK, et al. Twelve years of SAMtools and BCFtools. Gigascience (2021) 10(2):giab008.
 - [3] Hickey, G., Heller, D., Monlong, J. et al. Genotyping structural variants in pangenome graphs using the vg toolkit. Genome Biol 21, 35 (2020).
 - [4] Edgar, R.C. (2004) MUSCLE: multiple sequence alignment with high accuracy and high throughput.Nucleic Acids Res. 32(5):1792-1797.
 - [5] Mölder, F., Jablonski, K.P., Letcher, B., Hall, M.B., Tomkins-Tinch, C.H., Sochat, V., Forster, J., Lee, S., Twardziok, S.O., Kanitz, A., Wilm, A., Holtgrewe, M., Rahmann, S., Nahnsen, S., Köster, J., 2021. Sustainable data analysis with Snakemake. F1000Res 10, 33.
 
+
+[rgfa]: https://github.com/lh3/gfatools/blob/master/doc/rGFA.md
