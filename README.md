@@ -1,5 +1,5 @@
 # PanPop
-  Application of pan-genome to population based on resequnces
+  Application of pan-genome to population based on resequnces 
 
 # Usage
   A graph-based genome in GFA format and resequnce reads were needed. 
