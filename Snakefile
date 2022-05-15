@@ -16,13 +16,26 @@ workdir: zworkdir
 include: "subworkflows/callSV.py"
 SAMPLES = list_prepaire_files(config['sample_reads_list_file'])
 
-rule all:
-    input:
-        '5.final_result/2.final.sv.vcf.gz'
+if config['split_chr']==True:
+    CHRS = gfa2chrs('Ref.gfa')
+    #print(CHRS)
+    rule all:
+        input:
+            expand('4.realign/4.filter_maf1.{chr}.vcf.gz', chr=CHRS),
+            '5.final_result/1.final_mergechr.all.vcf.gz',
+            '5.final_result/2.final_mergechr.sv.vcf.gz',
+else:
+    CHRS=[]
+    rule all:
+        input:
+            '5.final_result/1.final.all.vcf.gz'
+            '5.final_result/2.final.sv.vcf.gz'
+
 
 for dir in [ztmpdir, '2.callSV', '3.merge_rawvcf', '4.realign', '5.final_result']:
     if not os.path.exists(dir):
         os.makedirs(dir)
+
 
 rule cleanall:
     params:
@@ -82,24 +95,38 @@ rule merge_rawvcfs_gen_list:
             for vcf in input.vcfs:
                 f.write(vcf + '\n')
 
-rule merge_rawvcfs:
-    input:
-        vcfslist = '3.merge_rawvcf/1.inputvcfs.list'
-    output:
-        vcf = '3.merge_rawvcf/2.merge_rawvcf.vcf.gz'
-    log:
-        'logs/3.2.merge_rawvcf.log'
-    shell:
-        """{BCFTOOLS} merge -m none -o {output.vcf} -O z -l {input.vcfslist} > {log} 2>&1
-        """
+if config['split_chr']==True:
+    rule merge_rawvcfs:
+        input:
+            vcfslist = '3.merge_rawvcf/1.inputvcfs.list'
+        output:
+            vcf = '3.merge_rawvcf/2.merge_rawvcf.{chr}.vcf.gz'
+        log:
+            'logs/3.2.merge_rawvcf.{chr}.log'
+        shell:
+            """
+            {BCFTOOLS} merge -m none -o {output.vcf} -O z -l {input.vcfslist} -r {wildcards.chr} > {log} 2>&1
+            """
+else : # no chr split
+    rule merge_rawvcfs:
+        input:
+            vcfslist = '3.merge_rawvcf/1.inputvcfs.list'
+        output:
+            vcf = '3.merge_rawvcf/2.merge_rawvcf.{chr}.vcf.gz'
+        log:
+            'logs/3.2.merge_rawvcf.{chr}.log'
+        shell:
+            """
+            {BCFTOOLS} merge -m none -o {output.vcf} -O z -l {input.vcfslist} > {log} 2>&1
+            """
 
 rule merge_same_pos:
     input:
-        vcf = '3.merge_rawvcf/2.merge_rawvcf.vcf.gz'
+        vcf = '3.merge_rawvcf/2.merge_rawvcf.{chr}.vcf.gz'
     output:
-        vcf = '3.merge_rawvcf/3.merge_same_pos.vcf.gz'
+        vcf = '3.merge_rawvcf/3.merge_same_pos.{chr}.vcf.gz'
     log:
-        'logs/3.3.merge_same_pos.vcf.gz.log'
+        'logs/3.3.merge_same_pos.{chr}.vcf.gz.log'
     threads: config['core_realign']
     resources:
         mem_mb=2000
@@ -109,12 +136,12 @@ rule merge_same_pos:
 
 rule filter_raw_vcf:
     input:
-        vcf = '3.merge_rawvcf/3.merge_same_pos.vcf.gz',
+        vcf = '3.merge_rawvcf/3.merge_same_pos.{chr}.vcf.gz',
         depthfile = '2.callSV.DPinfos.txt',
     output:
-        vcf = '3.merge_rawvcf/4.filter_raw_vcf.vcf.gz',
+        vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chr}.vcf.gz',
     log:
-        'logs/3.4.filter_raw_vcf.vcf.gz.log'
+        'logs/3.4.filter_raw_vcf.{chr}.vcf.gz.log'
     threads: config['core_realign']
     resources:
         mem_mb=2000
@@ -130,14 +157,13 @@ rule filter_raw_vcf:
 # Realign
 rule realign1:
     input:
-        vcf = '3.merge_rawvcf/4.filter_raw_vcf.vcf.gz',
+        vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chr}.vcf.gz',
         ref_fasta_file = 'Ref.gfa.fa'
     output:
-        vcf = '4.realign/1.realign1.vcf.gz',
-        vcf_sorted = '4.realign/1.realign1.sorted.vcf.gz',
-        #tmpdir_now = temp('4.realign/1.realign1.sorted.tempdir')
+        vcf = '4.realign/1.realign1.{chr}.vcf.gz',
+        vcf_sorted = '4.realign/1.realign1.{chr}.sorted.vcf.gz',
     log:
-        'logs/4.1.realign1.vcf.gz.log'
+        'logs/4.1.realign1.{chr}.vcf.gz.log'
     threads: config['core_realign']
     resources:
         mem_mb=config['mem_realign']
@@ -153,11 +179,11 @@ rule realign1:
 
 rule filter_maf1:
     input:
-        vcf = '4.realign/1.realign1.sorted.vcf.gz'
+        vcf = '4.realign/1.realign1.{chr}.sorted.vcf.gz'
     output:
-        vcf = '4.realign/2.filter_maf1.vcf.gz'
+        vcf = '4.realign/2.filter_maf1.{chr}.vcf.gz'
     log:
-        'logs/4.2.filter_maf1.vcf.gz.log'
+        'logs/4.2.filter_maf1.{chr}.vcf.gz.log'
     threads: config['core_realign']
     params:
         min_maf = config['MAF'],
@@ -169,14 +195,13 @@ rule filter_maf1:
 
 rule realign2:
     input:
-        vcf = '4.realign/2.filter_maf1.vcf.gz',
+        vcf = '4.realign/2.filter_maf1.{chr}.vcf.gz',
         ref_fasta_file = 'Ref.gfa.fa'
     output:
-        vcf = '4.realign/3.realign2.vcf.gz',
-        vcf_sorted = '4.realign/3.realign2.sorted.vcf.gz',
-        #tmpdir_now = temp('4.realign/3.realign2.sorted.tempdir')
+        vcf = '4.realign/3.realign2.{chr}.vcf.gz',
+        vcf_sorted = '4.realign/3.realign2.{chr}.sorted.vcf.gz',
     log:
-        'logs/4.3.realign1.vcf.gz.log'
+        'logs/4.3.realign1.{chr}.vcf.gz.log'
     threads: config['core_realign']
     resources:
         mem_mb=config['mem_realign']
@@ -192,11 +217,11 @@ rule realign2:
 
 rule filter_maf2:
     input:
-        vcf = '4.realign/3.realign2.sorted.vcf.gz'
+        vcf = '4.realign/3.realign2.{chr}.sorted.vcf.gz'
     output:
-        vcf = '4.realign/4.filter_maf1.vcf.gz'
+        vcf = '4.realign/4.filter_maf1.{chr}.vcf.gz'
     log:
-        'logs/4.4.filter_maf1.vcf.gz.log'
+        'logs/4.4.filter_maf1.{chr}.vcf.gz.log'
     threads: config['core_realign']
     params:
         min_maf = config['MAF'],
@@ -208,16 +233,16 @@ rule filter_maf2:
 # Finally
 rule split_vcf_by_type:
     input:
-        vcf = '4.realign/4.filter_maf1.vcf.gz'
+        vcf = '4.realign/4.filter_maf1.{chr}.vcf.gz'
     output:
-        vcf_all = '5.final_result/1.final.all.vcf.gz',
-        vcf_snp = '5.final_result/2.final.snp.vcf.gz',
-        vcf_indel = '5.final_result/2.final.indel.vcf.gz',
-        vcf_sv = '5.final_result/2.final.sv.vcf.gz'
+        vcf_all = '5.final_result/1.final.{chr}.all.vcf.gz',
+        vcf_snp = '5.final_result/2.final.{chr}.snp.vcf.gz',
+        vcf_indel = '5.final_result/2.final.{chr}.indel.vcf.gz',
+        vcf_sv = '5.final_result/2.final.{chr}.sv.vcf.gz'
     log:
-        'logs/5.split_vcf.log'
+        'logs/5.split_vcf.{chr}.log'
     params:
-        outprefix = '5.final_result/2.final',
+        outprefix = '5.final_result/2.final.{chr}',
         min_sv_len = config['SV_min_length']
     shell:
         """
@@ -225,3 +250,34 @@ rule split_vcf_by_type:
         perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
         """
 
+
+rule merge_vcf_splitchrs:
+    input:
+        vcfs = expand('4.realign/4.filter_maf1.{chr}.vcf.gz', chr=CHRS),
+    output:
+        vcf = '5.final_result/1.final_mergechr.all.vcf.gz'
+    threads:
+        6
+    log:
+        'logs/5.1.merge.log'
+    shell:
+        """
+        {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} > {log} 2>&1
+        """
+
+rule split_vcf_by_type_splitchr:
+    input:
+        vcf = '5.final_result/1.final_mergechr.all.vcf.gz'
+    output:
+        vcf_snp = '5.final_result/2.final_mergechr.snp.vcf.gz',
+        vcf_indel = '5.final_result/2.final_mergechr.indel.vcf.gz',
+        vcf_sv = '5.final_result/2.final_mergechr.sv.vcf.gz'
+    log:
+        'logs/5.2.split_vcf.log'
+    params:
+        outprefix = '5.final_result/2.final_mergechr',
+        min_sv_len = config['SV_min_length']
+    shell:
+        """
+        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
+        """
