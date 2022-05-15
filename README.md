@@ -47,6 +47,8 @@ All parameters were defined in `config.yaml` file
 
   `memory_tmp_dir`: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
 
+## Notice
+  Chromesome name cannot be `all`.
 
 
 ## Citations

@@ -1,10 +1,17 @@
-#################### I/O File paths ####################
+
+#################### Basic Parameters ####################
 ## Absolute paths are recommended instead of relative paths
 # workdir: Dir contains sample_read.list and will store result files.
 workdir: "example"
-#sample_reads_list_file: File name of sample_read.list. Must located in wirkdir
+# sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
 sample_reads_list_file: "1.sample.reads.list"
-# Graph-based reference should be renamed as `Ref.gfa` and then placed in `workdir`
+# split_chr: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
+split_chr: True
+# mode: (genotype or augment). `genotype` mode will genotype SVs in the graph-genome. `augment` mode will extract novel SNPs and SVs for each sample. Default is `genotype`.
+mode: "augment"
+# Graph-based reference should be renamed as `Ref.gfa` and then placed in `workdir`. This value is not recommand for modifing! Default is `Ref`.
+graph: 'Ref'
+
 
 #################### Binary Paths ####################
 ## Absolute paths are recommended instead of relative paths
@@ -19,16 +26,16 @@ mafft: ""
 
 
 #################### Filter Parameters ####################
-# MAP_MINQ: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5
+# MAP_MINQ: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5.
 MAP_MINQ: 5
-# MAF: Remove alleles than lower than this value. This is necessary and will greatly reduce the complexity of SVs. Default is 0.01
+# MAF: Remove alleles than lower than this value. This is necessary and will greatly reduce the complexity of SVs. Default is 0.01.
 MAF: 0.01
-# max_missing_rate: Max missing rate allowed for each SNPs and SVs. 0 means no missing allowed and 1 means not filter by missing. Default is 0.3 (remove this site if more than 30% samples were missing)
+# max_missing_rate: Max missing rate allowed for each SNPs and SVs. 0 means no missing allowed and 1 means not filter by missing. Default is 0.3 (remove this site if more than 30% samples were missing).
 max_missing_rate: 0.3
 # Hard-filter: Min depth for each site is XX fold of mean depth of this sample. Default is 1/3 ~ 3
 dp_min_fold: 0.333
 dp_max_fold: 3
-# Hard-filter: Min MAD(Minimum site allele depth) for each site is XX fold of mean depth of this sample. Default is 1/3 * 1/3
+# Hard-filter: Min MAD(Minimum site allele depth) for each site is XX fold of mean depth of this sample. Default is 1/3 * 1/3.
 mad_min_fold: 0.111
 
 
@@ -43,15 +50,18 @@ realign_extend_bp_min: 1
 SV_min_length: 50
 # realign_max_try_times_per_method: Default is 3.
 realign_max_try_times_per_method: 3
-# memory_tmp_dir: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
+# memory_tmp_dir: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is `Default` which for `/run/user/USERID`.
 memory_tmp_dir: "Default"
 # mapper: can be either 'map' or 'gaffe'
 mapper: 'gaffe'
+# aug_nonmut_min_cov: In augment mode, if the coverage of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Defalut is 0.8.
+aug_nonmut_min_cov: 0.8
+# aug_nomut_min_dp: In augment mode, if the average of depth of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Default is 3.
+aug_nomut_min_dp: 3
+
 
 
 #################### Performance & Resource ####################
-# split_chr: (False/True). Weather split chr for parallel running. This is useful for multi-node clster. Not recommaned for single node. Default is False.
-split_chr: False
 # cores used in multi-threaded steps
 core_realign: 10
 cores_xg: 20

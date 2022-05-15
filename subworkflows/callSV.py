@@ -40,15 +40,11 @@ def list_prepaire_files(file):
 ## Config
 ##
 
-
-# config values used a lot directly within shell commands
-#GRAPH=config['graph']
-GRAPH='Ref'
 # parse config values
+GRAPH=config['graph']
 MAPPER=config['mapper']
 
-
-MINQ=5
+MINQ=config['MAP_MINQ']
 if MAPPER=='GraphAligner': MINQ=0
 
 # BASEDIR is '2.callSV'
