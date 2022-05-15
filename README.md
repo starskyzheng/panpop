@@ -21,21 +21,26 @@
     git clone https://github.com/StarSkyZheng/panpop.git
     cd panpop
     snakemake -j 3 --reason --printshellcmds
-  Results located in `example/5.final_result`
+  Results located in `example/5.final_result` or `example/9.aug_final_result` for augment mode.
  
 ## <a name="install"></a>Install:
   Dependencies: python3 & perl>=5.24   
 
     pip install snakemake  
     cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
-  
-  
+
+
 ## <a name="parameters"></a>Parameters:
 All parameters were defined in `config.yaml` file  
-#### I/O File paths
-`workdir`: Dir contains sample_read.list and will store result files.
+#### Basic Parameters
+  `workdir`: Dir contains sample_read.list and will store result files.
 
-`sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir
+  `sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir
+
+  `split_chr`: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
+
+  `mode`: (genotype or augment). `genotype` mode will genotype SVs in the graph-genome. `augment` mode will extract novel SNPs and SVs for each sample. Default is `genotype`.
+
 
 #### Filter Parameters:
   `MAP_MINQ`: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5  
@@ -53,10 +58,16 @@ All parameters were defined in `config.yaml` file
 
 #### More parameters
   `SV_min_length`: Minimal length for SVs. Variat more than one base and smaller than this value will treated as InDels. Default is 50.  
-  
+
   `realign_max_try_times_per_method`: Max try-times of each align software. Default is 3.  
 
   `memory_tmp_dir`: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
+
+  `mapper`: Maping algorithm. Can be either 'map' or 'gaffe'
+
+  `aug_nonmut_min_cov`: In augment mode, if the coverage of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Defalut is 0.8.
+
+  `aug_nomut_min_dp`: In augment mode, if the average of depth of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Default is 3.
 
 ## <a name=notice></a>Notice
   Graph-genome should be [rGFA format][rgfa] and the name of chromosome must be specified.  
@@ -66,6 +77,7 @@ All parameters were defined in `config.yaml` file
   `scripts/build_graph.pl` can be used to build suitable gfa format from genome fasta files. 
 
 ## <a name=cite></a>Citations
+  This software used `HAlign`, `bcftools`, `vg`, `muscle` and `snakemake` software: 
 - [1] Shixiang Wan and Quan Zou, HAlign-II: efficient ultra-large multiple sequence alignment and phylogenetic tree reconstruction with distributed and parallel computing, Algorithms for Molecular Biology, 2017, 12:25.
 - [2] Danecek P, Bonfield JK, et al. Twelve years of SAMtools and BCFtools. Gigascience (2021) 10(2):giab008.
 - [3] Hickey, G., Heller, D., Monlong, J. et al. Genotyping structural variants in pangenome graphs using the vg toolkit. Genome Biol 21, 35 (2020).
