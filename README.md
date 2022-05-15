@@ -49,7 +49,7 @@ All parameters were defined in `config.yaml` file
 
 
 
-# Citations
+## Citations
 - [1] Shixiang Wan and Quan Zou, HAlign-II: efficient ultra-large multiple sequence alignment and phylogenetic tree reconstruction with distributed and parallel computing, Algorithms for Molecular Biology, 2017, 12:25.
 - [2] Danecek P, Bonfield JK, et al. Twelve years of SAMtools and BCFtools. Gigascience (2021) 10(2):giab008.
 - [3] Hickey, G., Heller, D., Monlong, J. et al. Genotyping structural variants in pangenome graphs using the vg toolkit. Genome Biol 21, 35 (2020).
