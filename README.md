@@ -71,10 +71,9 @@ All parameters were defined in `config.yaml` file
 
 ## <a name=notice></a>Notice
   Graph-genome should be [rGFA format][rgfa] and the name of chromosome must be specified.  
-  Chromesome name cannot be `all`.
-  Backbone genome should be numeric only.  
-  Non-Backbone genome should NOT be numeric only.  
-  `scripts/build_graph.pl` can be used to build suitable gfa format from genome fasta files. 
+  Chromesome name cannot be `all`.  
+  Backbone genome should be numeric only. Non-Backbone genome should NOT be numeric only.  
+  `scripts/build_graph.pl` can be used to build suitable gfa format from genome fasta files.   
 
 ## <a name=cite></a>Citations
   This software used `HAlign`, `bcftools`, `vg`, `muscle` and `snakemake` software: 
