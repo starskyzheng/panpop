@@ -72,7 +72,7 @@ rule merge_same_pos:
         vcf = '3.merge_rawvcf/3.merge_same_pos.{chrm}.vcf.gz'
     log:
         'logs/3.3.merge_same_pos.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=2000
     shell:
@@ -88,7 +88,7 @@ rule filter_raw_vcf:
         vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
     log:
         'logs/3.4.filter_raw_vcf.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=2000
     params:
@@ -110,7 +110,7 @@ rule realign1:
         vcf_sorted = '4.realign/1.realign1.{chrm}.sorted.vcf.gz',
     log:
         'logs/4.1.realign1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
     params:
@@ -130,7 +130,7 @@ rule filter_maf1:
         vcf = '4.realign/2.filter_maf1.{chrm}.vcf.gz'
     log:
         'logs/4.2.filter_maf1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     params:
         min_maf = config['MAF'],
         max_miss_freq = config['max_missing_rate']
@@ -149,7 +149,7 @@ rule realign2:
         vcf_sorted = '4.realign/3.realign2.{chrm}.sorted.vcf.gz',
     log:
         'logs/4.3.realign1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
     params:
@@ -169,7 +169,7 @@ rule filter_maf2:
         vcf = '4.realign/4.filter_maf1.{chrm}.vcf.gz'
     log:
         'logs/4.4.filter_maf1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     params:
         min_maf = config['MAF'],
         max_miss_freq = config['max_missing_rate']

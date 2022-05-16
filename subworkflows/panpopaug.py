@@ -32,18 +32,21 @@ rule cal_aug_dp:
     input:
         poss = '6.aug_dp/1.{chrm}.poss',
         pack = getpack_aug,
-        pg = getpg_aug
+        pg = getpg_aug,
     output: 
         list_packpg = '6.aug_dp/2.dps.{chrm}/{sample}.list_packpg',
         dpfile = '6.aug_dp/2.dps.{chrm}/{sample}.depth.txt.gz',
     log: 'logs/6.2.cal_aug_dp.{chrm}.{sample}.log',
-    threads: 1
+    threads: config['cores_aug_filldp'],
+    resources:
+        mem_mb=config['mem_aug_filldp'],
     params:
-        outdir = '6.aug_dp/2.dps.{chrm}'
+        outdir = '6.aug_dp/2.dps.{chrm}',
+        realthreads = 1,
     shell:
         """
         echo '{wildcards.sample} {input.pack} {input.pg}' > {output.list_packpg}
-        perl {workflow.basedir}/scripts/cal_range_depth_aug.pl --vcfposs {input.poss} --list_packpg {output.list_packpg} --outdir {params.outdir} -t {threads} --chr {wildcards.chrm} > {log} 2>&1
+        perl {workflow.basedir}/scripts/cal_range_depth_aug.pl --vcfposs {input.poss} --list_packpg {output.list_packpg} --outdir {params.outdir} -t {params.realthreads} --chr {wildcards.chrm} > {log} 2>&1
         """
 
 rule merge_dp_vcf:
@@ -59,6 +62,9 @@ rule merge_dp_vcf:
         min_dp = config['aug_nomut_min_dp'],
         min_cov = config['aug_nonmut_min_cov'],
     log: 'logs/6.3.merge_dp_vcf.{chrm}.{sample}.log',
+    threads: config['cores_aug_filldp']
+    resources:
+        mem_mb=config['mem_aug_filldp']
     shell:
         """
         perl {workflow.basedir}/scripts/cal_range_depth_aug.fillvcf.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref {input.ref} --min_dp {params.min_dp} --min_cov {params.min_cov} --chr {wildcards.chrm} --dp_file {input.dpfile} > {log} 2>&1
@@ -96,7 +102,7 @@ rule aug_merge_same_pos:
         vcf = '7.aug_merge_rawvcf/3.merge_same_pos.{chrm}.vcf.gz'
     log:
         'logs/7.3.merge_same_pos.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=2000
     shell:
@@ -112,7 +118,7 @@ rule aug_filter_raw_vcf:
         vcf = '7.aug_merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
     log:
         'logs/7.4.filter_raw_vcf.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=2000
     params:
@@ -134,7 +140,7 @@ rule aug_realign1:
         vcf_sorted = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz',
     log:
         'logs/8.1.realign1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
     params:
@@ -154,7 +160,7 @@ rule aug_filter_maf1:
         vcf = '8.aug_realign/2.filter_maf1.{chrm}.vcf.gz'
     log:
         'logs/8.2.filter_maf1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     params:
         min_maf = config['MAF'],
         max_miss_freq = config['max_missing_rate']
@@ -173,7 +179,7 @@ rule aug_realign2:
         vcf_sorted = '8.aug_realign/3.realign2.{chrm}.sorted.vcf.gz',
     log:
         'logs/8.3.realign1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
     params:
@@ -193,7 +199,7 @@ rule aug_filter_maf2:
         vcf = '8.aug_realign/4.filter_maf1.{chrm}.vcf.gz'
     log:
         'logs/8.4.filter_maf1.{chrm}.vcf.gz.log'
-    threads: config['core_realign']
+    threads: config['cores_realign']
     params:
         min_maf = config['MAF'],
         max_miss_freq = config['max_missing_rate']

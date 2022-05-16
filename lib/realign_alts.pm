@@ -105,11 +105,11 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
         return('HAlignC', $tried);
-    } elsif ( $$lefti{mafft}>0 ) {
+    } elsif ( exists $$lefti{mafft} and $$lefti{mafft}>0 ) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{mafft}+1;
         $$lefti{mafft}--;
         return('mafft', $tried);
-    } elsif ( $$lefti{muscle}>0 ) {
+    } elsif ( exists $$lefti{muscle} and $$lefti{muscle}>0 ) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
         $$lefti{muscle}--;
         return('muscle', $tried);
