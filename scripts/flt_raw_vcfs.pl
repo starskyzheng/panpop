@@ -52,6 +52,7 @@ my $dp_min_fold = 0.33;
 my $dp_max_fold = 3;
 my $mad_min_fold = 0.11;
 my $min_GQ = 0;
+my $remove_fail = 0;
 
 my $vcf_header_append = "##flt $0 @ARGV";
 
@@ -66,6 +67,7 @@ GetOptions (
     'dp_max_fold=s' => \$dp_max_fold,
     'mad_min_fold=s' => \$mad_min_fold,
     'min_GQ=i' => \$min_GQ,
+    'remove_fail!' => \$remove_fail,
 );
 
 
@@ -82,6 +84,7 @@ Options:
     --mad_min_fold		Hard-filter MAD (Minimum site allele depth) in each sample and each site, default: 0.11
     --miss_threshold	Filter site with more than X missing rates. Range from 0 to 1.	default: 1 (not filter)
     --min_GQ			Hard-filter GQ in each sample and each site, default: 0
+    --remove_fail       Bool. Whether to remove fail variants. default: false.
 EOF
     exit;
 }
@@ -131,6 +134,8 @@ die "NO idline: \n" if ! @idline;
 my $miss_threshold_now=($#idline-8) * $miss_threshold; ## 删除丢失 ?% 以上的
 $miss_threshold_now=int($miss_threshold_now)+1 if $miss_threshold_now>int($miss_threshold_now) + 0.5;
 
+say STDERR "All ids: " . (scalar($#idline)-8);
+say STDERR "Max missing ids: $miss_threshold_now";
 
 if ($thread eq 1) {
     while(<$INVCF>) {
@@ -257,6 +262,9 @@ sub flt {
     if ( $miss >= $miss_threshold_now ) {
         $a[6]="MISS";
         $is_pass=0;
+    }
+    if ($remove_fail==1 and $is_pass==0) {
+        return(undef);
     }
     $a[6]='PASS' if $is_pass==1;
     return join("\t",@a);
