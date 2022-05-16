@@ -18,6 +18,8 @@ def getpg_aug(wildcards):
     return('2.callSV/{sample}/{sample}-' + GRAPH + '.' + MAP + '.aug.pg')
 
 
+
+
 rule vcf2poss:
     input: '4.realign/1.realign1.{chrm}.sorted.vcf.gz',
     output: '6.aug_dp/1.{chrm}.poss',
@@ -73,9 +75,40 @@ rule merge_dp_vcf:
         """
 
 
+
+rule aug_merge_dp2_infos:
+    input:
+        DPinfos = expand('2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.pack.DPinfo', graph=GRAPH, map=MAPPER, minq=MINQ, sample=SAMPLES),
+        ref_fasta_file = GRAPH + '.gfa.fa',
+    output:
+        merged='2.callSV.aug.DPinfos.txt',
+    log: '2.callSV/logs/DPinfo.merged.log.txt',
+    run:
+        reflen = cal_fa_len(input.ref_fasta_file)
+        #print(reflen)
+        DPsums = dict()
+        for DPinfo in input.DPinfos:
+            with open(DPinfo, 'r') as f:
+                for line in f:
+                    if line.startswith('#'):
+                        continue
+                    else:
+                        line = line.strip().split('\t')
+                        sample = line[0]
+                        DPsum = line[2]
+                        DPsums[sample] = DPsum
+        OF = open(output.merged, 'w')
+        OF.write('sample\tDP\n')
+        for sample in DPsums:
+            DPsum = int(DPsums[sample])
+            DP = DPsum / reflen
+            OF.write('{sample}\t{DP}\n'.format(sample=sample, DP=DP))
+        #exit(-1)
+
+
 rule aug_merge_rawvcfs_gen_list:
     input:
-        vcfs = expand('6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.sort.vcf.gz', sample=SAMPLES, chrm='all'), ############
+        vcfs = expand('6.aug_dp/3.vcf_with_dp.{{chrm}}/{sample}.sort.vcf.gz', sample=SAMPLES),
     output:
         outfile = '7.aug_merge_rawvcf/1.inputvcfs.{chrm}.list',
     run:
@@ -90,9 +123,10 @@ rule aug_merge_rawvcfs:
         vcf = '7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
     log:
         'logs/7.2.merge_rawvcf.{chrm}.log'
+    threads: 4
     shell:
         """
-        {BCFTOOLS} merge -m none -o {output.vcf} -O z -l {input.vcfslist} > {log} 2>&1
+        {BCFTOOLS} merge -m none -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
         """
 
 rule aug_merge_same_pos:
@@ -113,7 +147,7 @@ rule aug_merge_same_pos:
 rule aug_filter_raw_vcf:
     input:
         vcf = '7.aug_merge_rawvcf/3.merge_same_pos.{chrm}.vcf.gz',
-        depthfile = '2.callSV.DPinfos.txt',
+        depthfile = '2.callSV.aug.DPinfos.txt',
     output:
         vcf = '7.aug_merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
     log:
