@@ -1,7 +1,9 @@
 # <a name="intro"></a>PanPop
 
-  Application of pan-genome to population based on resequnces 
-
+  Application of graph-based pan-genome to population based on resequnces.  
+  Panpop aims to combination `genome pan-graph` and `population resequnces` together. By using graph-genome to get more accurate population SVs and even SNPs in standard [VCF format][vcf], which is convenient for subsequent analysis.  
+  PanPop contains two mode. `genotype` mode will genotype SVs in the graph-genome which means no novel SVs nor SNPs were available. `augment` mode will also extract novel SNPs and SVs for each sample.  
+  PanPop compatibility to single server, [ssh-based cluster][snakemake_ssh], [slurm-based cluster][snakemake_slurm], grid and cloud environments. Most part of PanPop was written in parallel.
 
 
 - [Usage](#Usage)
@@ -10,6 +12,7 @@
   - [Parameters](#parameters)
   - [Notice](#notice)
 - [Citations](#cite)
+
 
 ## <a name="usage"></a>Usage
   A graph-based genome in GFA format and resequnce reads were needed. 
@@ -87,3 +90,6 @@ All parameters were defined in `config.yaml` file
 
 
 [rgfa]: https://github.com/lh3/gfatools/blob/master/doc/rGFA.md
+[snakemake_ssh]: https://github.com/StarSkyZheng/snakemake_ssh
+[snakemake_slurm]: https://snakemake.readthedocs.io/en/stable/executing/cluster.html
+[vcf]: https://samtools.github.io/hts-specs/VCFv4.2.pdf
