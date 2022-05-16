@@ -53,6 +53,7 @@ our $align_level = 1;
 my $is_aug = 0;
 my $ext_bp_max = 10;
 my $ext_bp_min = 1;
+my $print_all = 0;
 our $threads = 1; # default threads
 our $tmp_dir = $tmp_dir_def;
 
@@ -73,6 +74,7 @@ options:
     --tmpdir <dir>                 Temprory directory (default: $tmp_dir)
     -h | --help                    Print this help
     --verb <bool>
+    --all <bool>                   Print lines even no mutation.
 EOF
     exit(1);
 }
@@ -90,6 +92,7 @@ GetOptions (
         'tmpdir=s' => \$tmp_dir,
         'E|ext_bp_max=i' => \$ext_bp_max,
         'e|ext_bp_min=i' => \$ext_bp_min,
+        'all!' => \$print_all,
         #'level=i' => \$align_level,
 );
 
@@ -344,8 +347,13 @@ sub process_line_new {
         $alt_max_length = $len if $alt_max_length < $len;
         $alt_min_length = $len if $alt_min_length > $len;
     }
-    return([ &gen_lines_before_process($ids2alles, $ref_alts, $chr, $win_start) ]) 
-                if $is_snp==1 or $alt_min_length<=1; ##########
+    if ($is_snp==1 or $alt_min_length<=1) { ########## SNP
+        my $retline = &gen_lines_before_process($ids2alles, $ref_alts, 
+                                                    $chr, $win_start);
+        if ($retline) {
+            return([$retline])
+        } else {return undef}
+    }
     my $ref_len = length($$ref_alts[0]);
     my $max_alts = scalar(@$ref_alts)-1;
     #say STDERR $F[1];
@@ -367,7 +375,11 @@ sub gen_lines_before_process {
     for(my $i=0; $i<scalar(@$ref_alts); $i++) {
         $$ref_alts[$i]='*' if $$ref_alts[$i] eq '';
     }
-    my @new_line = ($chr, $win_start, '.', shift @$ref_alts, join(',', @$ref_alts),
+    my $ref_seq = shift @$ref_alts // die;
+    my $new_alts_join = join(',', @$ref_alts);
+    return undef if ($print_all==0 and ! @$ref_alts); # do not print if no alts
+    $new_alts_join = '.' if $new_alts_join eq ''; # no alts
+    my @new_line = ($chr, $win_start, '.', $ref_seq, $new_alts_join,
             '.', 'PASS', '.', 'GT');
     foreach my $idi (sort {$a<=>$b} keys %$ids2alles) {
         my $alle_array = $$ids2alles{$idi};
@@ -529,8 +541,8 @@ sub gen_lines {
         my $muts_now = $$muts{$nmut};
         my @alt_seqs = $muts_now->@[0..$max_alts];
         my ($remap_alts, $new_ref, $new_alts) = &thin_alts(\@alt_seqs);
-        next unless @$new_alts; # do not print if no alts
         my $ref_seq = shift @alt_seqs;
+        next unless ($print_all==0 and ! @$new_alts); # do not print if no alts
         my $new_alts_join = join(',', @$new_alts);
         $new_alts_join = '.' if $new_alts_join eq ''; # no alts
         my @line = ($chr, $old_pos+$nmut, '.', $new_ref, $new_alts_join, 
