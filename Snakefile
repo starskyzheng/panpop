@@ -30,7 +30,7 @@ if config['split_chr']==True:
     elif config['mode'] == 'augment':
         rule all:
             input:
-                expand('4.realign/4.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+                #expand('4.realign/4.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
                 '9.aug_final_result/1.final_mergechr.all.vcf.gz',
                 '9.aug_final_result/2.final_mergechr.sv.vcf.gz',
 elif config['split_chr']==False:
