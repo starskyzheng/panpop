@@ -1,3 +1,21 @@
+def get_depth_file(wildcards):
+    if config['mode'] == 'genotype':
+        return('2.callSV.DPinfos.txt')
+    elif config['mode'] == 'augment':
+        return('2.callSV.aug.DPinfos.txt')
+    else:
+        print("Error mode!")
+        exit(-1)
+
+
+def get_rawvcf_files(wildcards):
+    if config['mode'] == 'genotype':
+        return expand('2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ)
+    elif config['mode'] == 'augment':
+        return expand('2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ)
+    else:
+        print("Error mode!")
+        exit(-1)
 
 rule merge_dp2_infos:
     input:
@@ -32,7 +50,7 @@ rule merge_dp2_infos:
 # merge raw vcfs
 rule merge_rawvcfs_gen_list:
     input:
-        vcfs = expand('2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ),
+        vcfs = get_rawvcf_files,
     output:
         outfile = '3.merge_rawvcf/1.inputvcfs.list'
     run:
@@ -48,9 +66,10 @@ if config['split_chr']==True:
             vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
         log:
             'logs/3.2.merge_rawvcf.{chrm}.log'
+        threads: 4
         shell:
             """
-            {BCFTOOLS} merge -m none -o {output.vcf} -O z -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
+            {BCFTOOLS} merge -m none -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
             """
 else : # no chr split
     rule merge_rawvcfs:
@@ -60,9 +79,10 @@ else : # no chr split
             vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
         log:
             'logs/3.2.merge_rawvcf.{chrm}.log'
+        threads: 4
         shell:
             """
-            {BCFTOOLS} merge -m none -o {output.vcf} -O z -l {input.vcfslist} > {log} 2>&1
+            {BCFTOOLS} merge -m none -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
             """
 
 rule merge_same_pos:
@@ -83,7 +103,7 @@ rule merge_same_pos:
 rule filter_raw_vcf:
     input:
         vcf = '3.merge_rawvcf/3.merge_same_pos.{chrm}.vcf.gz',
-        depthfile = '2.callSV.DPinfos.txt',
+        depthfile = get_depth_file,
     output:
         vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
     log:
