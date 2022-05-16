@@ -1,9 +1,9 @@
 # <a name="intro"></a>PanPop
 
-  Application of graph-based pan-genome to population based on resequnces.  
+### Application of graph-based pan-genome to population based on resequnces.  
   Panpop aims to combination `genome pan-graph` and `population resequnces` together. By using graph-genome to get more accurate population SVs and even SNPs in standard [VCF format][vcf], which is convenient for subsequent analysis.  
   PanPop contains two mode. `genotype` mode will genotype SVs in the graph-genome which means no novel SVs nor SNPs were available. `augment` mode will also extract novel SNPs and SVs for each sample.  
-  PanPop compatibility to single server, [ssh-based cluster][snakemake_ssh], [slurm-based cluster][snakemake_slurm], grid and cloud environments. Most part of PanPop was written in parallel.
+  PanPop compatibility to single server, [ssh-based cluster][snakemake_ssh], [slurm-based cluster][snakemake_slurm], grid and cloud environments. Most part of PanPop was written in parallel which is also easy to install.
 
 
 - [Usage](#Usage)
@@ -28,10 +28,10 @@ snakemake -j 3 --reason --printshellcmds
 ```
   Results located in `example/5.final_result` or `example/9.aug_final_result` for augment mode.
  
-## <a name="install"></a>Install:
+## <a name="install"></a>Installation:
   Dependencies: python3 & perl>=5.24   
 ```sh
-pip install snakemake  
+pip3 install snakemake  
 cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
 ```
 
