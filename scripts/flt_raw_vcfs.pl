@@ -36,7 +36,13 @@ use MCE::Candy;
 
 
 my $depth_file;
-my $miss_threshold=1; ##### 1 means no filter
+
+##### miss_threshold:
+### >1:  no filter
+### 1:  only filter all missing site
+### 0:  only keep none missing site
+### 0~1:  filter
+my $miss_threshold=1; 
 
 my($in_vcf, $opt_help);
 my $thread='auto';
@@ -248,7 +254,7 @@ sub flt {
     }
     #say "$miss $miss_threshold_now";
     my $is_pass=1;
-    if ( $miss > $miss_threshold_now ) {
+    if ( $miss >= $miss_threshold_now ) {
         $a[6]="MISS";
         $is_pass=0;
     }

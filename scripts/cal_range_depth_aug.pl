@@ -32,6 +32,8 @@ use zzIO;
 use Data::Dumper;
 use MCE::Loop;
 use Getopt::Long;
+use read_config qw/read_config_yaml/;
+
 
 
 
@@ -46,7 +48,8 @@ sub help() {
         ";
 }
 
-my $vg = 'vg';
+my $config = read_config_yaml("$Bin/../config.yaml");
+my $vg = $$config{vg};
 
 my ($vcfposs_file, $packpg_list_file, $outdir, $need_chr);
 my ($opt_help);
@@ -78,23 +81,34 @@ say STDERR "Now read vcf_poss_file: $vcfposs_file";
 my ($vcfposs) ; &read_vcf_poss_file($vcfposs_file);
 say STDERR "Done read vcf_poss_file";
 
-
-MCE::Loop->init(
-   max_workers => $threads, chunk_size => 1
-);
-
-mce_loop {
-    my $sid = $_;
-    die unless exists $$gams{$sid};
-    my ($pack, $pg) = $$gams{$sid}->@*;
-    my $outfile = "$outdir/$sid.depth.txt.gz";
-    my $O = open_out_fh($outfile);
-    say STDERR "$sid start";
-    #return; ######
-    &process_dp($pack, $pg, $sid, $O);
-    say STDERR "$sid Done";
-} (@$need_ids);
-MCE::Loop->finish;
+if ($threads==1) {
+    foreach my $sid (@$need_ids) {
+        die unless exists $$gams{$sid};
+        my ($pack, $pg) = $$gams{$sid}->@*;
+        my $outfile = "$outdir/$sid.depth.txt.gz";
+        my $O = open_out_fh($outfile);
+        say STDERR "$sid start";
+        #return; ######
+        &process_dp($pack, $pg, $sid, $O);
+        say STDERR "$sid Done";
+    }
+} else { # multi-threads
+    MCE::Loop->init(
+        max_workers => $threads, chunk_size => 1
+    );
+    mce_loop {
+        my $sid = $_;
+        die unless exists $$gams{$sid};
+        my ($pack, $pg) = $$gams{$sid}->@*;
+        my $outfile = "$outdir/$sid.depth.txt.gz";
+        my $O = open_out_fh($outfile);
+        say STDERR "$sid start";
+        #return; ######
+        &process_dp($pack, $pg, $sid, $O);
+        say STDERR "$sid Done";
+    } (@$need_ids);
+    MCE::Loop->finish;
+}
 
 
 exit;

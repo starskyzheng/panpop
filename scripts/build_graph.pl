@@ -60,6 +60,8 @@ if (! -e $outdir) {
 }
 
 my $gfa1 = "$outdir/1.original.gfa";
+my $gfa2 = "$outdir/2.vg.gfa";
+my $gfa3 = "$outdir/3.final.gfa";
 
 my $cmd_build = "$minigraph --inv no -xggs -L 10 -K 4G -t $threads $backbone > $gfa1";
 
@@ -67,18 +69,12 @@ say STDERR "Now start build graph, command is:";
 say STDERR $cmd_build;
 system($cmd_build);
 
-my $cmd_gfa2vg = "$vg autoindex -w map -p $outdir/2.vg -g $gfa1";
-say STDERR "Now covert gfa to vg, command is:";
+my $cmd_gfa2vg = "$vg convert --gfa-out --gfa-in $gfa1 > $gfa2";
+say STDERR "Now covert gfa, command is:";
 say STDERR $cmd_gfa2vg;
 system($cmd_gfa2vg);
 
-my $xg = "$outdir/2.vg.xg";
-my $gfa2 = "$outdir/2.vg.gfa";
-my $gfa3 = "$outdir/3.final.gfa";
 
-say STDERR "Now covert vg to gfa";
-my $cmd_vg2gfa = "$vg view $xg > $gfa2";
-system($cmd_vg2gfa);
 
 say STDERR "Now modify gfa";
 &mod_vg_gfa($gfa2, $gfa3);
@@ -87,6 +83,9 @@ say STDERR "===========================";
 say STDERR "===========================";
 say STDERR "===========================";
 say STDERR "Done. final gfa file is $gfa3";
+say STDERR "===========================";
+say STDERR "===========================";
+
 exit;
 
 sub mod_vg_gfa {

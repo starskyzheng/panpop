@@ -2,15 +2,15 @@
 #################### Basic Parameters ####################
 ## Absolute paths are recommended for workdir and sample_reads_list_file
 # workdir: Dir contains sample_read.list and will store result files.
-workdir: "example"
+workdir: "/group_homes/lzu_public/home/share/zhengzy18/project/cor/b3"
 # sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
 sample_reads_list_file: "1.sample.reads.list"
 # split_chr: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
-split_chr: False
+split_chr: True
 # mode: (genotype or augment). `genotype` mode will genotype SVs in the graph-genome. `augment` mode will extract novel SNPs and SVs for each sample. Default is `genotype`.
-mode: "genotype"
+mode: "augment"
 # Graph-based reference should be renamed as `Ref.gfa` and then placed in `workdir`. This value is not recommand for modifing! Default is `Ref`.
-graph: 'Ref'
+graph: 'CHE-in'
 
 
 #################### Binary Paths ####################
@@ -20,9 +20,9 @@ stmsa: "misc/stmsa_0.2.1-ubuntu.20.04_amd64.out"
 bcftools: "misc/bcftools"
 vg: "misc/vg"
 tabix: "misc/tabix"
-# Optional but recommanded:
+# Optional but highly recommanded:
+mafft: "/group_homes/lzu_public/home/share/zhengzy18/software/mafft/mafft-7.490-with-extensions_built/bin/mafft"
 muscle3: "misc/muscle"
-mafft: ""
 # Only for build_graph.pl
 minigraph: "misc/minigraph"
 
@@ -64,7 +64,6 @@ aug_nomut_min_dp: 3
 
 #################### Performance & Resource ####################
 # cores used in multi-threaded steps
-core_realign: 10
 cores_xg: 20
 cores_snarls: 10
 cores_map: 20
@@ -72,6 +71,8 @@ cores_pack: 10
 cores_call: 10
 cores_augment: 5
 cores_avgdp: 6
+cores_realign: 40
+cores_aug_filldp: 5
 # for minimizer/gaffe mapper
 mem_xg: 60000
 mem_snarls: 120000
@@ -82,5 +83,6 @@ mem_pgconvert: 60000
 mem_augment: 70000
 mem_avgdp: 20000
 mem_realign: 20000
+mem_aug_filldp: 30000
 
 

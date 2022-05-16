@@ -11,4 +11,8 @@ wget 'https://github.com/vgteam/vg/releases/download/v1.36.0/vg'
 wget 'https://github.com/lh3/minigraph/releases/download/v0.18/minigraph-0.18.tar.bz2'
 
 # tabix
+# http://www.htslib.org/download/
+
+# musle
+wget 'https://drive5.com/muscle/downloads3.8.31/muscle3.8.31_i86linux64.tar.gz'
 

@@ -28,6 +28,7 @@ use Data::Dumper;
 #use MCE::Loop;
 use Getopt::Long;
 use prase_vcf qw/read_ref/;
+use read_config qw/read_config_yaml/;
 
 sub help() {
     say STDERR "@_" if @_;
@@ -55,11 +56,13 @@ EOF
 my ($in_vcf, $out_vcf, $dp_file, $ref_file);
 my $mincov = 0.8;
 my $mindp = 3;
-my $threads = 1;
+#my $threads = 1;
 my $sort_vcf = 0;
 my $need_chr;
 
 my ($opt_help);
+my $config = read_config_yaml("$Bin/../config.yaml");
+my $tabix = $$config{tabix};
 
 GetOptions (
         'help|h!' => \$opt_help,
@@ -98,7 +101,12 @@ sub run {
     my ($dp_file, $vcf_in, $vcf_out) = @_;
     say STDERR "Now: read depth";
     my ($dps) = &read_dp($dp_file);
-    my $I = open_in_fh($vcf_in);
+    my $I;
+    if ($need_chr) {
+        open($I, "$tabix --print-header $vcf_in $need_chr |");
+    } else {
+        $I = open_in_fh($vcf_in);
+    }
     my $O = open_out_fh($vcf_out, 6);
     say STDERR "Now: process VCF";
     &process_header($I, $O);
