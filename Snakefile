@@ -31,8 +31,10 @@ if config['split_chr']==True:
         rule all:
             input:
                 expand('8.aug_realign/4.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
-                '9.aug_final_result/1.final_mergechr.all.vcf.gz',
-                '9.aug_final_result/2.final_mergechr.sv.vcf.gz',
+                #'9.aug_final_result/1.final_mergechr.all.vcf.gz',
+                #'9.aug_final_result/2.final_mergechr.sv.vcf.gz',
+                '9.aug_final_result/3.3.filter_maf1.final_mergechr.all.vcf.gz',
+                '9.aug_final_result/4.3.filter_maf1.final_mergechr.all.vcf.gz',
 elif config['split_chr']==False:
     CHRS=['all']
     if config['mode'] == 'genotype':
