@@ -75,6 +75,7 @@ options:
     -h | --help                    Print this help
     --verb <bool>
     --all <bool>                   Print lines even no mutation.
+    --level <1|2>
 EOF
     exit(1);
 }
@@ -93,7 +94,7 @@ GetOptions (
         'E|ext_bp_max=i' => \$ext_bp_max,
         'e|ext_bp_min=i' => \$ext_bp_min,
         'all!' => \$print_all,
-        #'level=i' => \$align_level,
+        'level=i' => \$align_level,
 );
 
 
@@ -542,7 +543,7 @@ sub gen_lines {
         my @alt_seqs = $muts_now->@[0..$max_alts];
         my ($remap_alts, $new_ref, $new_alts) = &thin_alts(\@alt_seqs);
         my $ref_seq = shift @alt_seqs;
-        next unless ($print_all==0 and ! @$new_alts); # do not print if no alts
+        next if ($print_all==0 and ! @$new_alts); # do not print if no alts
         my $new_alts_join = join(',', @$new_alts);
         $new_alts_join = '.' if $new_alts_join eq ''; # no alts
         my @line = ($chr, $old_pos+$nmut, '.', $new_ref, $new_alts_join, 

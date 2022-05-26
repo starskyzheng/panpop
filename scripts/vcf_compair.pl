@@ -34,18 +34,20 @@ use MCE::Flow;
 use MCE::Candy;
 use Getopt::Long;
 use File::Basename;
-
+use List::Util qw/min max/;
 
 #our $config = read_config_yaml("$Bin/../config.yaml");
 
+my $rangebp = 5;
 my ($in1, $in2) = @ARGV;
-#    pan   gatk
+#   long  short
 
 my $outfile = '-';
 my $O = open_out_fh($outfile);
 
+say STDERR "Now read sort vcf: $in2";
+my ($h2, $v2, $ranges) = &read_vcf(open_in_fh($in2), 0.01, 1e6);
 
-my ($h2, $v2) = &read_vcf(open_in_fh($in2), 0.01, 1e6);
 my $I = open_in_fh($in1);
 
 
@@ -53,30 +55,105 @@ my $all=0;
 my $haspos = 0;
 
 
-say $O join "\t", qw/ chr pos haspos totalid sameid notsameid in2miss1 in1miss2 missboth/;
+say $O join "\t", qw/ chr pos haspos totalid sameid notsameid 
+                      in2miss1 in1miss2 missboth dist
+                      reflen altslenmin altslenmax is_snp/;
 
 my $totalid;
 my $ids_union;
+my %ranget;
 
 my @header;
-while(<$I>) {
-    chomp;
-    if (/^#/) {
-        next if /^##/;
-        @header = split(/\t/);
+say STDERR "Now process long vcf: $in1";
+while(my $line = <$I>) {
+    #last if $.>10000;
+    chomp $line;
+    if ($line=~/^#/) {
+        next if $line=~/^##/;
+        @header = split(/\t/, $line);
         next;
     }
-    /^(\S+)\t(\S+)/ or die;
+    $line=~s/^pchr(0)?//;
+    $line=~/^(\S+)\t(\S+)/ or die;
     my ($chr, $pos) = ($1, $2);
-    if (! exists $$v2{$chr}{$pos}) {
+    if ( ! exists $$v2{$chr}{$pos} and ! exists $$ranges{$chr}{$pos} ) {
         next;
+    } elsif ( ! exists $$v2{$chr}{$pos} and exists $$ranges{$chr}{$pos} ) {
+        my @F = split(/\t/, $line);
+        my $reflen = length($F[3]);
+        my ($altslenmin, $altslenmax, $is_snp) = &cal_alts_len($F[4]);
+        $is_snp=0 if $reflen!=1;
+        my $svpos = $$ranges{$chr}{$pos};
+        if ($is_snp==0) {
+            $ranget{$chr}{$svpos} = \@F;
+        }
+        next;
+    } elsif( exists $$v2{$chr}{$pos} ) {
+        my @F = split(/\t/, $line);
+        my $print = &cal($v2, \@F, \%ranget, $ranges);
+        say $O $print;
+    } else {
+        die;
     }
-    my @F = split(/\t/);
+}
+
+# snp with sv/indel around
+foreach my $chr (sort keys %ranget) {
+    foreach my $pos (sort {$a<=>$b} keys $ranget{$chr}->%*) {
+        my $F = $ranget{$chr}{$pos};
+        #my $pos = $$ranges{$chr}{$i} // die;
+        #my $print = &cal( $v2, $F );
+        #say $O $print;
+        my $reflen = length($$F[3]);
+        my ($altslenmin, $altslenmax, $is_snp) = &cal_alts_len($$F[4]);
+        $is_snp=0 if $reflen!=1;
+        my $miss=0;
+        die "$chr $pos" unless exists $$v2{$chr}{$pos};
+        foreach my $id (keys %$ids_union) {
+            if ($$v2{$chr}{$pos}{$id} eq '-') {
+                $miss++;
+            }
+        }
+        delete $$v2{$chr}{$pos};
+        say $O join "\t", $chr, $pos, 2, $totalid, -1, -1,
+                            -1, -1, $miss, abs($$F[1]-$pos), 
+                            $reflen, $altslenmin, $altslenmax, $is_snp;
+    }
+}
+
+# print miss
+foreach my $chr (sort keys %$v2) {
+    foreach my $pos (sort {$a<=>$b} keys $$v2{$chr}->%*) {
+        my $miss=0;
+        die unless exists $$v2{$chr}{$pos};
+        foreach my $id (keys %$ids_union) {
+            if ($$v2{$chr}{$pos}{$id} eq '-') {
+                $miss++;
+            }
+        }
+        say $O join "\t", $chr, $pos, 0, $totalid, -1, -1,
+                                -1, -1, $miss, -1,
+                                -1, -1, -1, -1;
+    }
+}
+
+exit;
+
+sub cal {
+    my ($v2, $F, $ranget, $ranges) = @_;
+    my $chr = $$F[0];
+    my $pos = $$F[1];
+    # remove ranges and ranget
+    for(my $i = $pos-$rangebp; $i<=$rangebp+$pos; $i++) {
+        delete $$ranget{$chr}{$i} if $ranget;
+        delete $$ranges{$chr}{$i} if $ranges;
+    }
     my %vcf;
-    my @ref_alts = ($F[3], split(/,/, $F[4]));
+    my @ref_alts = ($$F[3], split(/,/, $$F[4]));
     #@ref_alts = (0, (1) x split(/,/, $F[4]) ); ############
-    foreach my $i (9..$#F) {
-        my $infos = $F[$i];
+    my $maxi = scalar(@$F)-1;
+    foreach my $i (9..$maxi) {
+        my $infos = $$F[$i];
         my $id = $header[$i];
         if ($infos=~m#^(\d)[/|](\d+)#) {
             my $a1 = $ref_alts[$1] // die "$1 @ref_alts";
@@ -117,19 +194,28 @@ while(<$I>) {
         }
     }
     delete $$v2{$chr}{$pos};
-    say $O join "\t", $chr, $pos, 1, $totalid, $sameid, $notsameid, $in2miss1, $in1miss2, $missboth;
+    my $reflen = length($$F[3]);
+    my ($altslenmin, $altslenmax, $is_snp) = &cal_alts_len($$F[4]);
+    $is_snp=0 if $reflen!=1;
+    my $ret = join "\t", $chr, $pos, 1, $totalid, $sameid, $notsameid, 
+                            $in2miss1, $in1miss2, $missboth, 0, 
+                            $reflen, $altslenmin, $altslenmax, $is_snp;
+    return($ret);
 }
 
-foreach my $chr (sort keys %$v2) {
-    foreach my $pos (sort {$a<=>$b} keys $$v2{$chr}->%*) {
-        my $miss=0;
-        foreach my $id (keys %$ids_union) {
-            if ($$v2{$chr}{$pos}{$id} eq '-') {
-                $miss++;
-            }
-        }
-        say $O join "\t", $chr, $pos, 0, $totalid, -1, -1, -1, -1, $miss;
+
+sub cal_alts_len {
+    my ($alts) = @_;
+    my @altslen;
+    my $is_snp=1;
+    foreach my $alt (split(/,/, $alts)) {
+        push @altslen, length($alt);
+        $is_snp=0 if $alt eq '*';
+        $is_snp=0 if length($alt)>=2;
     }
+    my $altslenmin = min(@altslen);
+    my $altslenmax = max(@altslen);
+    return($altslenmin, $altslenmax, $is_snp);
 }
 
 
@@ -150,6 +236,7 @@ sub read_vcf {
     my @header;
     my %vcf;
     my $npos=0;
+    my %ranges;
     while(<$I>) {
         chomp;
         if (/^#/) {
@@ -164,6 +251,15 @@ sub read_vcf {
         }
         my @F = split(/\t/);
         my ($chr, $pos) = ($F[0], $F[1]);
+        for(my $i = $pos-$rangebp; $i<=$rangebp+$pos; $i++) {
+            if ( exists $ranges{$chr}{$i} ) { # remove oldpos
+                my $oldpos = $ranges{$chr}{$i};
+                delete $ranges{$chr}{$_} foreach $oldpos-$rangebp .. $oldpos+$rangebp;
+                delete $vcf{$chr}{$i};
+                #die "$chr $pos: $i exists!" 
+            }
+            $ranges{$chr}{$i} = $pos;
+        }
         my @ref_alts = ($F[3], split(/,/, $F[4]));
         #@ref_alts = (0, (1) x split(/,/, $F[4]) ); ############
         foreach my $i (9..$#F) {
@@ -179,6 +275,6 @@ sub read_vcf {
         }
         $npos++;
     }
-    return(\@header, \%vcf);
+    return(\@header, \%vcf, \%ranges);
 }
 

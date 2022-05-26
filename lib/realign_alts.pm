@@ -29,6 +29,7 @@ use zzIO;
 use List::Util qw/max min/;
 use Data::Dumper;
 use Carp qw/confess carp/; # carp=warn;confess=die
+use IPC::Open2;
 
 require Exporter;
 
@@ -46,12 +47,13 @@ use vars qw(
     'all' => [
         qw(
             process_alts
+            aln_halign
         )
     ]
 );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-@EXPORT    = qw(process_alts);
+@EXPORT    = qw(process_alts aln_halign);
 
 
 
@@ -70,10 +72,9 @@ sub init {
     $HAlignC = $main::config->{stmsa} // confess "stmsa path not defined in config file";
     $muscle3 = $main::config->{muscle3} // undef;
     $mafft = $main::config->{mafft} // undef;
-
     $tmp_dir = $main::tmp_dir // confess "tmp_dir not defined";
     $debug = $main::debug // confess "debug not defined";
-    $align_level = $main::align_level // confess "align_level not defined";
+    $align_level = $main::align_level // 1;
 
     foreach my $refs ([$HAlignC, 'stmsa'], 
                       [$muscle3, 'muscle3'],
@@ -105,7 +106,7 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
         return('HAlignC', $tried);
-    } elsif ( exists $$lefti{mafft} and $$lefti{mafft}>0 ) {
+    } elsif ( $length>50 and exists $$lefti{mafft} and $$lefti{mafft}>0 ) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{mafft}+1;
         $$lefti{mafft}--;
         return('mafft', $tried);
@@ -113,6 +114,10 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
         $$lefti{muscle}--;
         return('muscle', $tried);
+    } elsif ( exists $$lefti{mafft} and $$lefti{mafft}>0 ) {
+        my $tried = $ALN_PARAMS_max_tryi-$$lefti{mafft}+1;
+        $$lefti{mafft}--;
+        return('mafft', $tried);
     } elsif ( $$lefti{HAlignC}>0 ) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
@@ -327,17 +332,23 @@ sub alt_alts_to_muts {
 
 sub append_sarray {
     my ($sarray, $append, $max_alts) = @_;
-    if (! @$sarray) {
-        @$sarray = @$append;
-        return;
-    }
     unless (defined $max_alts) {
         $max_alts = scalar(@$append) - 1;
     }
-    for (my $i=0; $i<=$max_alts ; $i++) {
-        my $app_seq = $$append[$i];
-        next if $app_seq eq '-'; # skip miss
-        $$sarray[$i] .= $app_seq;
+    if (! @$sarray) {
+        for (my $i=0; $i<=$max_alts ; $i++) {
+            my $app_seq = $$append[$i];
+            $app_seq='' if $app_seq eq '-'; # skip miss
+            $$sarray[$i] = $app_seq;
+        }
+        return;
+    } else {
+        for (my $i=0; $i<=$max_alts ; $i++) {
+            my $app_seq = $$append[$i];
+            next if $app_seq eq '-'; # skip miss
+            $$sarray[$i] .= $app_seq;
+        }
+        return;
     }
 }
 
@@ -426,7 +437,7 @@ sub read_fa_fh {
     }
     close $fh;
     my @seqids = sort {$a<=>$b} keys %seqs;
-    return [ @seqs{@seqids} ];
+    return( [ @seqs{@seqids} ] );
 }
 
 
