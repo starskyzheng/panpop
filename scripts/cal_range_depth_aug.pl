@@ -76,9 +76,9 @@ say STDERR "Start to calculate depth for: " . join(' ', @$need_ids);
 
 
 
-
+my $lastpos = -1;
 say STDERR "Now read vcf_poss_file: $vcfposs_file";
-my ($vcfposs) ; &read_vcf_poss_file($vcfposs_file);
+my ($vcfposs) = &read_vcf_poss_file($vcfposs_file);
 say STDERR "Done read vcf_poss_file";
 
 if ($threads==1) {
@@ -88,7 +88,6 @@ if ($threads==1) {
         my $outfile = "$outdir/$sid.depth.txt.gz";
         my $O = open_out_fh($outfile);
         say STDERR "$sid start";
-        #return; ######
         &process_dp($pack, $pg, $sid, $O);
         say STDERR "$sid Done";
     }
@@ -103,7 +102,6 @@ if ($threads==1) {
         my $outfile = "$outdir/$sid.depth.txt.gz";
         my $O = open_out_fh($outfile);
         say STDERR "$sid start";
-        #return; ######
         &process_dp($pack, $pg, $sid, $O);
         say STDERR "$sid Done";
     } (@$need_ids);
@@ -122,7 +120,11 @@ sub read_vcf_poss_file {
         chomp;
         next unless $_;
         my ($chr, $pos, @lens) = split(/\t/, $_);
-        $ret{$chr}{$pos} = \@lens;
+        if ( scalar(@lens)>1 ) {
+            $ret{$chr}{$pos} = \@lens;
+        } else { # only 1 item
+            $ret{$chr}{$pos} = $lens[0];
+        }
         #last if $.>100; # for debug
     }
     return(\%ret);
@@ -133,10 +135,11 @@ sub process_dp {
     my (%counts, %sum_dps);
     die unless -e $pack;
     die unless -e $pg;
-    my $cmd = "$vg depth -k $pack $pg";
+    my $cmd = "$vg depth --threads 4 --pack $pack $pg";
     if (defined $need_chr) {
         $cmd .= " --ref-path $need_chr";
     }
+    #$cmd = 'zcat ~/a.gz'; ############# debug
     open(my $P, "$cmd |");
     my %buf;
     my $chr_old;
@@ -155,11 +158,18 @@ sub process_dp {
             $chr_old = $chr;
             redo LINEDP;
         }
-        if (exists $$vcfposs{$chr}{$pos}) {
-            my $lens = $$vcfposs{$chr}{$pos};
-            foreach my $len (@$lens) {
-                my $end = $pos + $len - 1;
-                $buf{$end}{$pos} = [0, 0]; # count, sum_dp
+        $lastpos = -1 if ($lastpos > $pos); # change chr
+        for(;$lastpos<=$pos; $lastpos++) {
+            #say("$lastpos $pos $chr"); # debug
+            if (exists $$vcfposs{$chr}{$lastpos}) {
+                my $lens = $$vcfposs{$chr}{$lastpos};
+                if (ref($lens) eq '') {
+                    $lens = [$lens];
+                }
+                foreach my $len (@$lens) {
+                    my $end = $lastpos + $len - 1;
+                    $buf{$end}{$lastpos} = [0, 0]; # count, sum_dp
+                }
             }
         }
         foreach my $end(keys %buf) {
@@ -183,6 +193,7 @@ sub print1 {
         my $len = $end - $start + 1;
         my $sumdp = $$toprint{$start}[1];
         my $count = $$toprint{$start}[0];
+        next if $sumdp==0 and $count==0;
         say $O join "\t", $chr, $start, $len, $sumdp, $count;
     }
 }

@@ -28,8 +28,14 @@ def list_prepaire_files(file):
             r1 = dirnow + sid + '_1.fastq.gz'
             r2 = dirnow + sid + '_2.fastq.gz'
             if not os.path.exists(r1):
+                if not os.path.exists(r1_ori):
+                    print("Error! read not exists! : " + r1_ori)
+                    exit(-1)
                 os.symlink(r1_ori, r1)
             if not os.path.exists(r2):
+                if not os.path.exists(r2_ori):
+                    print("Error! read not exists! : " + r2_ori)
+                    exit(-1)
                 os.symlink(r2_ori, r2)
             sids.append(sid)
     return sids
@@ -187,6 +193,7 @@ rule call_novcf:
         snarls='{graph}.snarls'
     output:
         vcf_ext="2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz",
+        vcf_ext_idx="2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz.tbi",
         vcf='2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.vcf.gz',
         idx='2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.vcf.gz.tbi'
     threads: config['cores_call']
@@ -288,6 +295,7 @@ rule call_aug:
         snarls='2.callSV/{sample}/{sample}-{graph}.{map}.aug.snarls'
     output:
         vcf_ext='2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.call.ext.vcf.gz',
+        vcf_ext_idx='2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.call.ext.vcf.gz.tbi',
         vcf='2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.call.vcf.gz',
         idx='2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.call.vcf.gz.tbi'
     threads: config['cores_call']

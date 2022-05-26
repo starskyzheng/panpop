@@ -152,7 +152,7 @@ rule filter_maf1:
         'logs/4.2.filter_maf1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
-        min_maf = config['MAF'],
+        min_maf = config['genotype_MAF'],
         max_miss_freq = config['max_missing_rate']
     shell:
         """
@@ -191,7 +191,7 @@ rule filter_maf2:
         'logs/4.4.filter_maf1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
-        min_maf = config['MAF'],
+        min_maf = config['genotype_MAF'],
         max_miss_freq = config['max_missing_rate']
     shell:
         """
