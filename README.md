@@ -32,7 +32,7 @@ snakemake -j 3 --reason --printshellcmds
   Dependencies: python3 & perl>=5.24   
 ```sh
 pip3 install snakemake  
-cpanm Data::Dumper MCE::Flow MCE::Candy Getopt::Long List::Util Carp  File::Spec YAML Coro::Generator MCE::Channel Tie::CharArray  IPC::Open2 File::Temp  
+cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel Getopt::Long List::Util Carp File::Spec YAML Tie::CharArray IPC::Open2 File::Temp  
 ```
 
 ## <a name="parameters"></a>Parameters:
