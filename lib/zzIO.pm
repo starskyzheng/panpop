@@ -32,6 +32,7 @@ use vars qw(
 #BEGIN {}
 
 my $bgzip = 'bgzip';
+my $pigz = 'pigz';
 
 sub open_in_fh($;$) {
     my $in = $_[0] or confess "zzIO::open_in_fh: given no filename";
@@ -48,7 +49,7 @@ sub open_in_fh($;$) {
         confess "$in not exists! " unless -e $in;
         open ($fh,"zcat $in|");
         if ($parallel>1) {
-            open ($fh,"pigz --stdout --decompress --processes $parallel $in|");
+            open ($fh,"$pigz --stdout --decompress --processes $parallel $in|");
         } else {
             open ($fh,"zcat $in|");
         }
@@ -66,13 +67,14 @@ sub open_out_fh($;$) {
     my $parallel = $_[1] // 2;
     confess "'$parallel' is not a Integer" unless $parallel=~/^\d+$/;
     my $fh;
-    if ($out =~ /\.vcf\.gz$/) {
-        #$parallel ? open ($fh,"| pigz -p $parallel -c - > $out") : open ($fh,"| $bgzip -c > $out");
+    if ($out =~ /\.gz$/) {
+    #if ($out =~ /\.vcf\.gz$/) {
+        #$parallel ? open ($fh,"| $pigz -p $parallel -c - > $out") : open ($fh,"| $bgzip -c > $out");
         open ($fh,"| $bgzip -c -@ $parallel > $out");
         return $fh;
-    }elsif ($out =~ /\.gz$/) {
-        $parallel > 1 ? open ($fh,"| pigz -p $parallel -c - > $out") : open ($fh,"| gzip -c - > $out");
-        return $fh;
+    #}elsif ($out =~ /\.gz$/) {
+    #    $parallel > 1 ? open ($fh,"| pigz -p $parallel -c - > $out") : open ($fh,"| gzip -c - > $out");
+    #    return $fh;
     }elsif (ref $out eq 'GLOB' ) {
         return $out;
     }elsif ($out eq '-') {

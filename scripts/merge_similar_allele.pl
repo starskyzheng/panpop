@@ -36,7 +36,7 @@ use MCE::Flow;
 use MCE::Candy;
 use Getopt::Long;
 use MCE::Channel;
-use Coro::Generator;
+#use Coro::Generator;
 use File::Temp;
 use List::Util qw/ max min shuffle /;
 use File::Basename;

@@ -4,7 +4,7 @@
 #
 rule index_init:
     input:
-        gfa='{genome}.gfa',
+        gfa='{genome}.rgfa',
     output: '{genome}.xg', '{genome}.gcsa', '{genome}.gcsa.lcp'
     threads: config['cores_xg']
     params:
@@ -19,7 +19,7 @@ rule index_init:
 rule index_giraffe:
     input:
         #ref='{genome}.fa',
-        gfa='{genome}.gfa',
+        gfa='{genome}.rgfa',
     output: '{genome}.dist', '{genome}.giraffe.gbz', '{genome}.min'
     threads: config['cores_xg']
     params:
@@ -29,6 +29,16 @@ rule index_giraffe:
     log: '2.callSV/logs/{genome}-autoindex-giraffe.log.txt'
     shell:
         '{VG} autoindex --tmp-dir {ZTMPDIR} --workflow giraffe --gfa {input.gfa} --prefix {params.prefix} -t {threads} >> {log} 2>&1'
+
+
+rule vg2gfa:
+    input:
+        '{graph}.xg'
+    output:
+        '{graph}.gfa'
+    shell:
+        'vg view --gfa {input} > {output}'
+
 
 rule gfa2fa:
     input: '{genome}.gfa'

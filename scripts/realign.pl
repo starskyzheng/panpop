@@ -36,7 +36,6 @@ use MCE::Flow;
 use MCE::Candy;
 use Getopt::Long;
 use MCE::Channel;
-use Coro::Generator;
 use File::Temp;
 use List::Util qw/max min/;
 
@@ -132,61 +131,6 @@ EOF
 my $vcf_header = &read_vcf_header($I_VCF, $O_VCF, $VCF_APPEND);
 my $idi_max = scalar(@$vcf_header)-1;
 
-my $zzgenerator = generator {
-    my $I = $I_VCF;
-    my @lines;
-    my $min_start;
-    my $max_end;
-    my $end_real;
-    my $chr_old;
-    while(<$I>) {
-        chomp;
-        next if /^#/;
-        next unless $_;
-        my $snpid = $.;
-        #my $snpid = "$F[0]:$F[1]"; # may not unique
-        my @F = split(/\t/, $_);
-        next if $F[4] eq '';
-        my $chr = $F[0];
-        my $pos = $F[1];
-        my $ref_seq = $F[3];
-        my @alts = split(/,/, $F[4]);
-        $F[4] = \@alts;
-        # next if $pos < 14999102; ######### debug
-        #next if exists $SKIPCHR{$F[0]};
-        unless (defined $chr_old) { # init
-            $chr_old = $chr;
-            $min_start = $pos;
-            ($max_end, $end_real) = &cal_max_ext_range($ref_seq, \@alts, $pos, -1);
-            redo;
-        }
-        
-        if ($chr_old ne $chr or $max_end+1 < $pos) {
-            #print(STDERR "2!! $chr_old\t$min_start\t$max_end\t$pos\n");
-            die unless defined $min_start;
-            die unless defined $end_real;
-            yield([\@lines, $chr_old, $min_start, $end_real]);
-            @lines=();
-            if ($chr_old ne $chr) {
-                $chr_old = undef;
-                $min_start = undef;
-                $max_end = undef;
-                $end_real = undef;
-            } else {
-                $max_end = $pos;
-                $end_real = $pos;
-                $min_start = $pos;
-            }
-            redo;
-        }
-        $min_start //= $pos;
-        ($max_end, $end_real) = &cal_max_ext_range($ref_seq, \@alts, $pos, $max_end);
-        push @lines, \@F;
-    }
-    close $I;
-    yield([\@lines, $chr_old, $min_start, $end_real]) if @lines;
-    yield(undef);
-};
 
 sub zz_MCE_OUT {
     my $fh = $_[0];
@@ -289,14 +233,60 @@ sub mce_run {
 }
 
 sub zz_mce_producer {
+    my $I = $I_VCF;
+    my @lines;
+    my $min_start;
+    my $max_end;
+    my $end_real;
+    my $chr_old;
     my $iline=1;
-    while ( my ($parms) = $zzgenerator->() ) {
-        unless (defined $parms) { # finsh read vcf
-            last;
+    while(<$I>) {
+        chomp;
+        next if /^#/;
+        next unless $_;
+        my $snpid = $.;
+        #my $snpid = "$F[0]:$F[1]"; # may not unique
+        my @F = split(/\t/, $_);
+        next if $F[4] eq '';
+        my $chr = $F[0];
+        my $pos = $F[1];
+        my $ref_seq = $F[3];
+        my @alts = split(/,/, $F[4]);
+        $F[4] = \@alts;
+        # next if $pos < 14999102; ######### debug
+        #next if exists $SKIPCHR{$F[0]};
+        unless (defined $chr_old) { # init
+            $chr_old = $chr;
+            $min_start = $pos;
+            ($max_end, $end_real) = &cal_max_ext_range($ref_seq, \@alts, $pos, -1);
+            redo;
         }
-        $queue->enqueue( $iline, $parms ) ;
+        if ($chr_old ne $chr or $max_end+1 < $pos) {
+            #print(STDERR "2!! $chr_old\t$min_start\t$max_end\t$pos\n");
+            die unless defined $min_start;
+            die unless defined $end_real;
+            $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] ) ;
+            @lines=();
+            if ($chr_old ne $chr) {
+                $chr_old = undef;
+                $min_start = undef;
+                $max_end = undef;
+                $end_real = undef;
+            } else {
+                $max_end = $pos;
+                $end_real = $pos;
+                $min_start = $pos;
+            }
+            redo;
+        }
+        $min_start //= $pos;
+        ($max_end, $end_real) = &cal_max_ext_range($ref_seq, \@alts, $pos, $max_end);
+        push @lines, \@F;
         $iline++;
     }
+    close $I;
+    $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] )  if @lines;
+    $queue->end();
 }
 
 

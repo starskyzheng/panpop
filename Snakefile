@@ -20,7 +20,7 @@ SAMPLES = list_prepaire_files(config['sample_reads_list_file'])
 
 
 if config['split_chr']==True:
-    CHRS = gfa2chrs( GRAPH + '.gfa')
+    CHRS = rgfa2chrs( GRAPH + '.rgfa')
     if config['mode'] == 'genotype':
         rule all:
             input:
@@ -30,7 +30,8 @@ if config['split_chr']==True:
     elif config['mode'] == 'augment':
         rule all:
             input:
-                expand('8.aug_realign/4.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+                expand('8.aug_realign/4.3.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+                expand('8.aug_realign/3.3.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
                 #'9.aug_final_result/1.final_mergechr.all.vcf.gz',
                 #'9.aug_final_result/2.final_mergechr.sv.vcf.gz',
                 '9.aug_final_result/3.3.filter_maf1.final_mergechr.all.vcf.gz',

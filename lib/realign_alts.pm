@@ -24,7 +24,7 @@ use v5.24;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
-use Bio::SeqIO;
+#use Bio::SeqIO;
 use zzIO;
 use List::Util qw/max min/;
 use Data::Dumper;
@@ -102,7 +102,7 @@ sub check_bin_path {
 sub select_aln_software {
     my ($lefti, $length) = @_;
     my $next;
-    if ( $length > 0 and $$lefti{HAlignC}>0 ) {
+    if ( $length > 0 and $$lefti{HAlignC}>0 ) { ##########
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
         return('HAlignC', $tried);
@@ -156,7 +156,7 @@ sub aln_halign {
     }
     my $alnfh = open_in_fh($fastaaln);
     my $aln_alts = &read_fa_fh($alnfh);
-    unlink $fastaaln;
+    unlink $fastaaln if $debug==0;
     return($aln_exit_status, $aln_alts);
 }
 

@@ -5,7 +5,7 @@
 #
 #        USAGE: ./gfa2fa.pl in.gfa out.fa
 #
-#  DESCRIPTION: 根据path信息，将gfa转换为fasta
+#  DESCRIPTION: 根据path信息，将gfa转换为fasta (not rgfa)
 #
 #      OPTIONS: ---
 # REQUIREMENTS: ---
