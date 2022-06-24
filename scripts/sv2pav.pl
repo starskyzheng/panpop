@@ -126,7 +126,7 @@ sub process_line {
             }
         }
     } elsif ($reflen >= $sv_min_dp and $alt_min_len <= $max_len_tomerge) { # del
-        my $shortest_ialt = 0;
+        my $shortest_ialt = 1;
         my $shortest_len = length $alts[0];
         foreach my $ialt (1..$#ref_alts) {
             my $len = length $ref_alts[$ialt];
@@ -168,7 +168,7 @@ sub process_line {
     } else {
         $F[4] = join ",", @ref_alts[@$newalts]; 
     }
-    if($debug==1 and $F[1] eq '1619431') { # debug
+    if($debug==1 and $F[1] eq '90651') { # debug
         say STDERR "replace: " . Dumper \%replace;
         say STDERR "replace2: " . Dumper $replace2;
         say STDERR "newalts: " . Dumper $newalts;
