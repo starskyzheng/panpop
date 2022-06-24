@@ -37,6 +37,9 @@ use MCE::Candy;
 
 my ($in, $out, $opt_help);# = @ARGV;
 my $thread = 1;
+my $sv_min_dp = 10;
+my $max_len_tomerge = 2;
+my $debug = 0;
 
 sub usage {
     print <<EOF;
@@ -44,7 +47,9 @@ Usage: $0 [options]
 Options:
     -i | --invcf	    input vcf file
     -o | --outvcf	    output file, default: -
-    -p | --threads  	thread number, default: 1
+    -p | --threads  	thread number, default: $thread
+    --sv_min_dp         sv_min_dp, default: $sv_min_dp
+    --max_len_tomerge   max_len_tomerge, default: $max_len_tomerge
 EOF
     exit;
 }
@@ -54,12 +59,15 @@ GetOptions (
     'i|invcf=s' => \$in,
     'o|outvcf=s' => \$out,
     't|threads=i' => \$thread,
+    'max_len_tomerge=i' => \$max_len_tomerge,
+    'sv_min_dp=i' => \$sv_min_dp,
+    'debug!' => \$debug,
 );
 
 &usage() if $opt_help or not $in or not $out;
 
 my $I = open_in_fh($in);
-my $O = open_out_fh($out);
+my $O = open_out_fh($out, 8);
 
 
 if ($thread eq 1) {
@@ -87,6 +95,7 @@ mce_flow_f {
     },
     \&flt_mce,
     $I;
+
 close $I;
 exit 0;
 
@@ -104,13 +113,19 @@ sub process_line {
     my $reflen = length $ref;
     my $alt_max_len = max map {length} @alts;
     my $alt_min_len = min map {length} @alts;
-    my %replase;
-    if ($reflen <= 2 and $alt_max_len > 10) { # ins
+    my %replace;
+    if ($reflen >= $sv_min_dp and $alt_max_len>=$sv_min_dp) {
+        # cannot determine type
+    } elsif ($reflen <= $sv_min_dp and $alt_max_len<=$sv_min_dp) {
+        # cannot determine type
+    } elsif ($reflen <= $max_len_tomerge and $alt_max_len >= $sv_min_dp) { # ins
         foreach my $ialt (1..$#ref_alts) {
             my $len = length $ref_alts[$ialt];
-            $replase{$ialt} = 0 if $len <= 2;
+            if ($len <= $max_len_tomerge) {
+                $replace{$ialt} = 0 if $ialt != 0;
+            }
         }
-    } elsif ($reflen > 10 and $alt_min_len <= 2) { # del
+    } elsif ($reflen >= $sv_min_dp and $alt_min_len <= $max_len_tomerge) { # del
         my $shortest_ialt = 0;
         my $shortest_len = length $alts[0];
         foreach my $ialt (1..$#ref_alts) {
@@ -122,25 +137,85 @@ sub process_line {
         }
         foreach my $ialt (0..$#ref_alts) {
             my $len = length $ref_alts[$ialt];
-            $replase{$ialt} = $shortest_ialt if $len <= 2;
+            if ($len <= $max_len_tomerge) {
+                $replace{$ialt} = $shortest_ialt if $ialt != $shortest_ialt;
+            }
         }
     }
-    #say STDERR Dumper \%replase;
+    my ($replace2, $newalts) = &gen_replace2(\%replace, scalar(@ref_alts)-1);
+    #say STDERR Dumper \%replace;
     foreach my $isid (9..$#F) {
         my $alle_infos = $F[$isid];
         $alle_infos =~ /^([^:]+)(:|$)/ or die;
         my $GT = $1;
+        if ($GT=~/\./) {
+            $F[$isid] = './.';
+            next;
+        }
         my @alleles = split /[\|\/]/, $GT;
         die unless scalar(@alleles)==2;
         foreach my $ialt (0..$#alleles) {
             my $alle = $alleles[$ialt];
-            if (exists $replase{$alle}) {
-                $alleles[$ialt] = $replase{$alle};
-            }
+            #if (exists $replace{$alle}) {
+            #    $alleles[$ialt] = $replace{$alle};
+            #}
+            $alleles[$ialt] = $$replace2{$alle} // die "$alle";
         }
         $F[$isid] = join "/", @alleles;
     }
+    if (scalar(@$newalts)==0) {
+        $F[4] = '.';
+    } else {
+        $F[4] = join ",", @ref_alts[@$newalts]; 
+    }
+    if($debug==1 and $F[1] eq '1619431') { # debug
+        say STDERR "replace: " . Dumper \%replace;
+        say STDERR "replace2: " . Dumper $replace2;
+        say STDERR "newalts: " . Dumper $newalts;
+        die;
+    }
     return join("\t", @F);
+}
+
+sub gen_replace2 {
+    my ($replace, $nref_alts) = @_;
+    my %replace2;
+    # init
+    foreach my $ialt (0..$nref_alts) {
+        $replace2{$ialt} = $ialt;
+    }
+    # replace
+    foreach my $ialt (keys %$replace) {
+        my $dst = $$replace{$ialt};
+        $replace2{$ialt} = $dst;
+    }
+    # fix
+    my %to_subtracts;
+    foreach my $ialt (sort {$a<=>$b} keys %$replace) {
+        my $ialt1 = $ialt+1;
+        foreach my $ii ($ialt1..$nref_alts) {
+            $to_subtracts{$ii}++;
+        }
+    }
+    foreach my $ialt (sort keys %to_subtracts) {
+        next if exists $$replace{$ialt};
+        my $to_subtract = $to_subtracts{$ialt};
+        $replace2{$ialt} -= $to_subtract;
+    }
+    # fix2
+    foreach my $ialt (keys %replace2) {
+        my $dst_ori = $replace2{$ialt};
+        if (exists $$replace{$ialt}) {
+            my $dst = $replace2{$dst_ori};
+            $replace2{$ialt} = $dst;
+        }
+    }
+    my @newalts;
+    foreach my $ialt (1..$nref_alts) {
+        next if exists $$replace{$ialt};
+        push @newalts, $ialt unless $ialt~~@newalts;
+    }
+    return(\%replace2, \@newalts);
 }
 
 
