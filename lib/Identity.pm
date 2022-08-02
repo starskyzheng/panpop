@@ -24,6 +24,7 @@ sub new {
     my $self={
         _nseqs => $args{nseqs},
         groups => [],
+        lock=>undef,
     };
     bless($self, $class || ref($class));
     return $self;
@@ -31,6 +32,10 @@ sub new {
 
 sub addpair() {
     my ($self, $id1, $id2) = @_;
+    my $lock = $self->{lock};
+    if (defined $lock) {
+        $lock->lock();
+    }
     my $groups = $self->{groups};
     ADDPAIRREDO:
     my $id1g = $self->is_in_group($id1);
@@ -50,6 +55,9 @@ sub addpair() {
     } elsif ( $id1g != -1 and $id2g != -1 and $id1g != $id2g ) {
         # merge two groups
        $self->merge_groups( [$id1g, $id2g] );
+    }
+    if (defined $lock) {
+        $lock->unlock();
     }
 }
 
@@ -159,6 +167,7 @@ sub cal_group_by_mcl {
     return \@groups;
 }
 =cut
+
 
 
 1;

@@ -24,7 +24,7 @@ use File::Spec;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
-use zzIO;
+#use zzIO;
 use YAML qw(LoadFile);
 
 require Exporter;
@@ -57,7 +57,7 @@ sub read_config_yaml {
     foreach my $key (keys %$config) {
         delete $config->{$key} if ref($config->{$key}) eq '' and $config->{$key} eq '';
     }
-    foreach my $bin (qw/stmsa bcftools vg tabix muscle3 
+    foreach my $bin (qw/stmsa bcftools vg tabix muscle3 bgzip
                             mafft minigraph stretcher/) {
         my $path = $config->{$bin};
         next unless defined $path and $path ne '';

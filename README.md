@@ -31,8 +31,9 @@ snakemake -j 3 --reason --printshellcmds
 ## <a name="install"></a>Installation:
   Dependencies: python3 & perl>=5.24   
 ```sh
-pip3 install snakemake  
-cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel Getopt::Long List::Util Carp File::Spec YAML Tie::CharArray IPC::Open2 File::Temp  
+pip3 install --user snakemake
+curl -L https://cpanmin.us | perl - App::cpanminus
+cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long List::Util Carp File::Spec YAML Tie::CharArray IPC::Open2 File::Temp  
 ```
 
 ## <a name="parameters"></a>Parameters:

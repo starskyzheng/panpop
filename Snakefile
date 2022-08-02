@@ -7,6 +7,7 @@ GRAPH=config['graph']
 MAPPER=config['mapper']
 BCFTOOLS = os.path.abspath(config['bcftools'])
 VG = os.path.abspath(config["vg"])
+BGZIP = os.path.abspath(config["bgzip"])
 TABIX = os.path.abspath(config["tabix"])
 ZWORKDIR = config['workdir']
 ZTMPDIR = 'tmp'
@@ -20,7 +21,8 @@ SAMPLES = list_prepaire_files(config['sample_reads_list_file'])
 
 
 if config['split_chr']==True:
-    CHRS = rgfa2chrs( GRAPH + '.rgfa')
+    CHRS = gfa2chrs( GRAPH + '.gfa')
+    #CHRS = rgfa2chrs( GRAPH + '.rgfa')
     if config['mode'] == 'genotype':
         rule all:
             input:

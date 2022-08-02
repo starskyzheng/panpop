@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-use zzIO;
 use warnings;
 use strict;
 use v5.24;
@@ -14,6 +13,7 @@ use MCE::Channel;
 use MCE::Flow;
 use MCE::Candy;
 use Getopt::Long;
+use zzIO;
 no warnings 'qw';
 
 sub help {

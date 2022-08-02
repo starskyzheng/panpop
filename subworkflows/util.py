@@ -47,6 +47,9 @@ def rgfa_read_chr(rgfa_file):
         for line in f:
             if line.startswith('S'):
                 re_results = re.search( r'\t(\S+)\t\S+\t(\S+)$', line.strip() )
+                if not re_results:
+                    print("????")
+                    print(line)
                 SR_raw = re_results.group(2)
                 SR_now = re.search(r'^SR:i:(\d+)$', SR_raw).group(1)
                 #print(SR_now)

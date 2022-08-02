@@ -47,7 +47,7 @@ Usage: $0 [options]
 Options:
     -i | --invcf	    input vcf file
     -o | --outvcf	    output file, default: -
-    -p | --threads  	thread number, default: $thread
+    -t | --threads  	thread number, default: $thread
     --sv_min_dp         sv_min_dp, default: $sv_min_dp
     --max_len_tomerge   max_len_tomerge, default: $max_len_tomerge
 EOF

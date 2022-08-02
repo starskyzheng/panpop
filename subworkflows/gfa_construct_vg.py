@@ -4,7 +4,8 @@
 #
 rule index_init:
     input:
-        gfa='{genome}.rgfa',
+        gfa='{genome}.gfa',
+        #gfa='{genome}.rgfa',
     output: '{genome}.xg', '{genome}.gcsa', '{genome}.gcsa.lcp'
     threads: config['cores_xg']
     params:
@@ -18,8 +19,8 @@ rule index_init:
 
 rule index_giraffe:
     input:
-        #ref='{genome}.fa',
-        gfa='{genome}.rgfa',
+        gfa='{genome}.gfa',
+        #gfa='{genome}.rgfa',
     output: '{genome}.dist', '{genome}.giraffe.gbz', '{genome}.min'
     threads: config['cores_xg']
     params:
@@ -35,9 +36,9 @@ rule vg2gfa:
     input:
         '{graph}.xg'
     output:
-        '{graph}.gfa'
+        '{graph}.xg.gfa'
     shell:
-        'vg view --gfa {input} > {output}'
+        '{VG} view --gfa {input} > {output}'
 
 
 rule gfa2fa:

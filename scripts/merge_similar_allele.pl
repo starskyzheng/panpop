@@ -34,6 +34,8 @@ use IPC::Open2;
 use Tie::CharArray;
 use MCE::Flow;
 use MCE::Candy;
+use MCE::Shared;
+use MCE::Mutex;
 use Getopt::Long;
 use MCE::Channel;
 #use Coro::Generator;
@@ -68,6 +70,7 @@ our $tmp_dir = $tmp_dir_def;
 my $threads = 32;
 our $verb = 0;
 our $debug = 0;
+my $max_refalts_threshold = 16;
 
 GetOptions (
         'help|h!' => \$opt_help,
@@ -98,10 +101,11 @@ while ( <$I> ){
     }
 }
 
+my $lines_cpx = MCE::Shared->array();
 
 if ($threads==1) {
     while(my $line = <$I>) {
-        my $result = prase_line($line);
+        my $result = &prase_line($line);
         say $O $result if $result;
     }
 } else {
@@ -115,6 +119,16 @@ if ($threads==1) {
 }
 
 close $I;
+
+my $lines_cpx_len = $lines_cpx->len();
+if ($lines_cpx_len>0) {
+    say STDERR "Now processing: lines_cpx_len lines: $lines_cpx_len !\n";
+    foreach my $line (@$lines_cpx) {
+        my ($result, $is_cpx) = &prase_line($line, $threads, 1);
+        say $O $result if $result;
+    }
+}
+
 #close $O;
 
 say STDERR "Done.";
@@ -123,17 +137,24 @@ exit;
 
 sub flt_mce {
     my ( $mce, $chunk_ref, $chunk_id ) = @_;
-    my $result = &prase_line($$chunk_ref[0]);
-    if (defined $result) {
-        $mce->gather($chunk_id, $result, "\n") 
+    my ($result, $is_cpx) = &prase_line($$chunk_ref[0], 1, 0);
+    if ($is_cpx==1) {
+        $lines_cpx->push($result);
+        return();
     } else {
-        $mce->gather($chunk_id);
+        if (defined $result) {
+            $mce->gather($chunk_id, $result, "\n");
+        } else {
+            $mce->gather($chunk_id);
+        }
     }
 }
 
 
 sub prase_line {
-    my($line) = @_;
+    my ($line, $threads, $force_cpx) = @_;
+    $threads//=1;
+    $force_cpx//=0;
     chomp $line;
     #say STDERR "line::: ", $line;
     my @F = split(/\t/, $line);
@@ -142,12 +163,15 @@ sub prase_line {
     my @alts = split(/,/, $F[4]);
     my @ref_alts = ($ref, @alts);
     my $max_refaltsi = scalar(@ref_alts)-1;
-    my $iline = $.;
+    if ($force_cpx==0 and $max_refaltsi >= $max_refalts_threshold) {
+        return($line, 1);
+    }
     #my $random = time() . "_" . rand();
     #my $temp_prefile = "$tmp_dir/$random";
-    my $groups = &get_identity_halign(\@ref_alts);
+    my $groups = &get_identity_halign(\@ref_alts, $threads);
     my ($replace, $newseqs) = &cal_maxlen_allele(\@ref_alts, $groups);
     my $newline = &buildline(\@F, $replace, $newseqs);
+    return($newline, 0);
 }
 
 sub buildline {
@@ -219,9 +243,9 @@ sub cal_maxlen_allele {
 
 
 sub get_identity_halign {
-    my ($seqs) = @_;
+    my ($seqs, $threads) = @_;
+    $threads//=1;
     my $len = scalar(@$seqs) - 1;
-    my %ret;
     my $obj = new Identity({nseqs=>$len});
     #return {"@ids"=>-1} if length( $$seqs{$ids[0]} ) > 1000; ######## DEBUG
     my @pairs;
@@ -231,41 +255,55 @@ sub get_identity_halign {
             push @pairs, "$i1:$i2";
         }
     }
-    foreach my $pair (shuffle @pairs) {
-        my ($id1, $id2) = split(/:/, $pair);
-        my $seq1 = $$seqs[$id1];
-        my $len1 = length($seq1);
-        next if $obj->needs_run($id1, $id2) == 0;
-        say STDERR "get_identity_halign : $id1 $id2" if $debug;
-        my $seq2 = $$seqs[$id2];
-        my $len2 = length($seq2);
-        my $lendiff = abs($len1-$len2);
-        if ($seq1 eq '' and $seq2 eq '') {
-            say STDERR "WARN: seq for $id1 and $id2 Both empty, identity set to 1" if $verb;
-            #$ret{"$id1:$id2"} = 1;
-        } elsif($seq1 eq '' or $seq2 eq '') {
-            say STDERR "WARN: seq for $id1 or $id2 is empty! identity set to 0" if $verb;
-            #$ret{"$id1:$id2"} = 0;
-        } elsif ($lendiff>0.5*$len1 or $lendiff>0.5*$len2) {
-            say STDERR "WARN: lendiff for $id1 $id2 to large: $lendiff! identity set to 0" if $verb;
-            #$ret{"$id1:$id2"} = 0;
-        } else {
-            my ($aln_exit_status, $aln_seqs) = aln_halign('HAlignC', [$seq1, $seq2], 1);
-            if ($aln_exit_status != 0) {
-                #$ret{"$id1:$id2"} = 0;
-                next;
-            }
-            my $identity = &seq2same($aln_seqs);
-            #$ret{"$id1:$id2"} = $identity;
-            if ($identity > $mcl_group_threshold_identity) {
-                $obj->addpair($id1, $id2);
-            }
+    if($threads==1) {
+        foreach my $pair (shuffle @pairs) {
+            &run_get_identity_halign_pair($pair, $seqs, $obj);
         }
+    } else {
+        my $mutex = MCE::Mutex->new;
+        $obj->{lock} = $mutex;
+        mce_flow {
+                chunk_size => 1,
+                max_workers => $threads, 
+            },
+            sub{ &run_get_identity_halign_pair($_, $seqs, $obj, $mutex) },
+            \@pairs;
     }
-    #die;
-    #return(\%ret);
     my $groups = $obj->get_final_groups();
     return($groups);
+}
+
+sub run_get_identity_halign_pair {
+    my ($pair, $seqs, $obj) = @_;
+    my ($id1, $id2) = split(/:/, $pair);
+    my $seq1 = $$seqs[$id1];
+    my $len1 = length($seq1);
+    return if $obj->needs_run($id1, $id2) == 0;
+    say STDERR "get_identity_halign : $id1 $id2" if $debug;
+    my $seq2 = $$seqs[$id2];
+    my $len2 = length($seq2);
+    my $lendiff = abs($len1-$len2);
+    if ($seq1 eq '' and $seq2 eq '') {
+        say STDERR "WARN: seq for $id1 and $id2 Both empty, identity set to 1" if $verb;
+        $obj->addpair($id1, $id2);
+        return;
+    } elsif($seq1 eq '' or $seq2 eq '') {
+        say STDERR "WARN: seq for $id1 or $id2 is empty! identity set to 0" if $verb;
+        return;
+    } elsif ($lendiff>0.5*$len1 or $lendiff>0.5*$len2) {
+        say STDERR "WARN: lendiff for $id1 $id2 to large: $lendiff! identity set to 0" if $verb;
+        return;
+    } else {
+        my ($aln_exit_status, $aln_seqs) = aln_halign('HAlignC', [$seq1, $seq2], 1);
+        if ($aln_exit_status != 0) {
+            next;
+        }
+        my $identity = &seq2same($aln_seqs);
+        if ($identity > $mcl_group_threshold_identity) {
+            $obj->addpair($id1, $id2);
+        }
+        return;
+    }
 }
 
 sub seq2same {

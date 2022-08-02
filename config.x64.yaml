@@ -3,14 +3,14 @@
 ## Absolute paths are recommended for workdir and sample_reads_list_file
 # workdir: Dir contains sample_read.list and will store result files.
 #workdir: "example"
-workdir: "/group_homes/lzu_arm_cluster/home/share/zhengzy18/project/ath/6.graph"
+workdir: "/group_homes/lzu_public/home/share/zhengzy18/project/ath/6.graph"
 # sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
 sample_reads_list_file: "1.sample.reads.list"
 # split_chr: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
 split_chr: True
 # mode: (genotype or augment). `genotype` mode will genotype SVs in the graph-genome. `augment` mode will extract novel SNPs and SVs for each sample. Default is `genotype`.
 mode: "augment"
-# Graph-based reference should be renamed as `Ref.rgfa` and then placed in `workdir`. This value is not recommand for modifing! Default is `Ref`.
+# Graph-based reference should be renamed as `Ref.gfa` and then placed in `workdir`. This value is not recommand for modifing! Default is `Ref`.
 graph: 'Ref'
 
 
@@ -18,33 +18,33 @@ graph: 'Ref'
 ## absolute paths are recommended instead of relative paths
 ## amd64
 # required:
-#stmsa: "misc/stmsa_0.2.1-ubuntu.20.04_amd64.out"
-#bcftools: "misc/bcftools"
-#vg: "misc/vg"
-#tabix: "misc/tabix"
-#bgzip: "misc/bgzip"
-#seqs2identity: "src/gotoh/align"
+stmsa: "misc/stmsa_0.2.1-ubuntu.20.04_amd64.out"
+bcftools: "misc/bcftools"
+vg: "misc/vg"
+tabix: "misc/tabix"
+bgzip: "misc/bgzip"
+seqs2identity: "src/gotoh/align"
 # optional but highly recommanded:
-#mafft: "/group_homes/lzu_public/home/share/zhengzy18/software/mafft/mafft-7.490-with-extensions_built/bin/mafft"
-#muscle3: "misc/muscle"
+mafft: "/group_homes/lzu_public/home/share/zhengzy18/software/mafft/mafft-7.490-with-extensions_built/bin/mafft"
+muscle3: "misc/muscle"
 # only for build_graph.pl
-#minigraph: "misc/minigraph"
-#seqs2identity: ""
+minigraph: "misc/minigraph"
+seqs2identity: ""
 
 ## ARM64
 # required:
-stmsa: "misc_arm/stmsa"
-bcftools: "misc_arm/bcftools"
-vg: "misc_arm/vg"
-tabix: "misc_arm/tabix"
-bgzip: "misc_arm/bgzip"
-seqs2identity: "src/gotoh/align"
+#stmsa: "misc_arm/stmsa"
+#bcftools: "misc_arm/bcftools"
+#vg: "misc_arm/vg"
+#tabix: "misc_arm/tabix"
+#bgzip: "misc_arm/bgzip"
+#seqs2identity: "src/gotoh/align"
 ## optional but highly recommanded:
-mafft: ""
-muscle3: "misc/muscle"
-seqs2identity: ""
+#mafft: ""
+#muscle3: "misc/muscle"
+#seqs2identity: ""
 # only for build_graph.pl
-minigraph: "misc/minigraph"
+#minigraph: "misc/minigraph"
 
 
 #################### Filter Parameters ####################

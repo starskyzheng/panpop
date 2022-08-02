@@ -5,8 +5,14 @@ package zzIO;
 #use strict;
 #use warnings;
 
-require Exporter;
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+
+use read_config qw/read_config_yaml/;
 use Carp;
+
+require Exporter;
+
 use vars qw(
   @ISA
   %EXPORT_TAGS
@@ -31,8 +37,10 @@ use vars qw(
 
 #BEGIN {}
 
-my $bgzip = 'bgzip';
-my $pigz = 'pigz';
+my $config = read_config_yaml("$Bin/../config.yaml");
+my $bgzip = $$config{bgzip} or die "bgzip not defined in config file!";
+my $pigztest = `which pigz 2>/dev/null`; chomp $pigztest;
+my $pigz = $pigztest ? $pigztest : $bgzip;
 
 sub open_in_fh($;$) {
     my $in = $_[0] or confess "zzIO::open_in_fh: given no filename";
