@@ -59,11 +59,11 @@ if (! -e $outdir) {
     mkdir $outdir or die "$outdir can not be created";
 }
 
-my $gfa1 = "$outdir/1.original.gfa";
+my $gfa1 = "$outdir/1.original.rgfa";
 my $gfa2 = "$outdir/2.vg.gfa";
 my $gfa3 = "$outdir/3.final.gfa";
 
-my $cmd_build = "$minigraph o $gfa1 --inv no -xggs -L 10 -K 4G -t $threads $backbone @moregenomes";
+my $cmd_build = "$minigraph -o $gfa1 --inv no -xggs -L 10 -K 4G -t $threads $backbone @moregenomes";
 
 say STDERR "Now start build graph, command is:";
 say STDERR $cmd_build;

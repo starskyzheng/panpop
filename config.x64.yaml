@@ -2,8 +2,7 @@
 #################### Basic Parameters ####################
 ## Absolute paths are recommended for workdir and sample_reads_list_file
 # workdir: Dir contains sample_read.list and will store result files.
-#workdir: "example"
-workdir: "/group_homes/lzu_public/home/share/zhengzy18/project/ath/6.graph"
+workdir: "example"
 # sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
 sample_reads_list_file: "1.sample.reads.list"
 # split_chr: (False or True). Weather split by chromosome for parallel running. This is useful for multi-node clster. This option can greatly reduce the memory usage in augment mode. If you only own one computer-node the recommended setting is False. Default is False.
@@ -25,7 +24,7 @@ tabix: "misc/tabix"
 bgzip: "misc/bgzip"
 seqs2identity: "src/gotoh/align"
 # optional but highly recommanded:
-mafft: "/group_homes/lzu_public/home/share/zhengzy18/software/mafft/mafft-7.490-with-extensions_built/bin/mafft"
+mafft: "misc/mafft-linux64/mafft.bat"
 muscle3: "misc/muscle"
 # only for build_graph.pl
 minigraph: "misc/minigraph"
