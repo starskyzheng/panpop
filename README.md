@@ -76,7 +76,7 @@ All parameters were defined in `config.yaml` file
   `aug_nomut_min_dp`: In augment mode, if the average of depth of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Default is 3.
 
 ## <a name=notice></a>Notice
-  Graph-genome should be [rGFA format][rgfa] and the name of chromosome must be specified.  
+  Graph-genome should be [GFA format][gfa] and the name of chromosome must be specified.  
   Chromesome name cannot be `all`.  
   Backbone genome should be numeric only. Non-Backbone genome should NOT be numeric only.  
   `scripts/build_graph.pl` can be used to build suitable gfa format from genome fasta files.   
@@ -89,7 +89,7 @@ All parameters were defined in `config.yaml` file
 - [4] Edgar, R.C. (2004) MUSCLE: multiple sequence alignment with high accuracy and high throughput.Nucleic Acids Res. 32(5):1792-1797.
 - [5] Mölder, F., Jablonski, K.P., Letcher, B., Hall, M.B., Tomkins-Tinch, C.H., Sochat, V., Forster, J., Lee, S., Twardziok, S.O., Kanitz, A., Wilm, A., Holtgrewe, M., Rahmann, S., Nahnsen, S., Köster, J., 2021. Sustainable data analysis with Snakemake. F1000Res 10, 33.
 
-
+[gfa]: http://gfa-spec.github.io/GFA-spec/GFA1.html
 [rgfa]: https://github.com/lh3/gfatools/blob/master/doc/rGFA.md
 [snakemake_ssh]: https://github.com/StarSkyZheng/snakemake_ssh
 [snakemake_slurm]: https://snakemake.readthedocs.io/en/stable/executing/cluster.html
