@@ -23,6 +23,7 @@ def getpg_aug(wildcards):
 
 rule vcf2poss:
     input: '4.realign/1.realign1.{chrm}.sorted.vcf.gz',
+    #input: '3.merge_rawvcf/3.merge_same_pos.{chrm}.vcf.gz',
     output: '6.aug_dp/1.{chrm}.poss',
     log:  'logs/6.1.vcf2poss.{chrm}.log',
     threads: 1
