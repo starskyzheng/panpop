@@ -128,7 +128,7 @@ rule aug_merge_rawvcfs:
     threads: 4
     shell:
         """
-        {BCFTOOLS} merge -m none -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
+        {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
         """
 
 rule aug_merge_same_pos:
