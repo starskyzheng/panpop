@@ -69,7 +69,7 @@ if config['split_chr']==True:
         threads: 4
         shell:
             """
-            {BCFTOOLS} merge -m none -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
+            {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
             """
 else : # no chr split
     rule merge_rawvcfs:
@@ -82,7 +82,7 @@ else : # no chr split
         threads: 4
         shell:
             """
-            {BCFTOOLS} merge -m none -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
+            {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
             """
 
 rule merge_same_pos:
