@@ -203,7 +203,7 @@ rule call_novcf:
     shell:
         """
         {VG} call -k {input.pack} -t {threads} -s {wildcards.sample} --genotype-snarls --snarls {input.snarls} {input.xg} 2>> {log} | {BCFTOOLS} sort 2>> {log} | {BGZIP} --threads {threads} > {output.vcf_ext}
-        "{TABIX} -f -p vcf {output.vcf_ext
+        "{TABIX} -f -p vcf {output.vcf_ext}
         {BCFTOOLS} view -e 'GT=\"0/0\" || GT=\"./.\"' {output.vcf_ext} | {BCFTOOLS} filter -i 'FILTER==\"PASS\"' | {BGZIP} --threads {threads} > {output.vcf}
         {TABIX} -f -p vcf {output.vcf}
         """
