@@ -125,10 +125,11 @@ rule aug_merge_rawvcfs:
         vcf = '7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
     log:
         'logs/7.2.merge_rawvcf.{chrm}.log'
-    threads: 4
+    threads: 44
     shell:
+        # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
         """
-        {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
+        perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 100 --threads 11 --bcftools_threads 4 > {log} 2>&1
         """
 
 rule aug_merge_same_pos:

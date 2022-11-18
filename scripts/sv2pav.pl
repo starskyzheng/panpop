@@ -109,6 +109,7 @@ sub process_line {
     my @F = split /\t/, $line;
     my $ref = $F[3];
     my @alts = split /,/, $F[4];
+    die $line unless @alts;
     my @ref_alts = ($ref, @alts);
     my $reflen = length $ref;
     my $alt_max_len = max map {length} @alts;

@@ -66,10 +66,11 @@ if config['split_chr']==True:
             vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
         log:
             'logs/3.2.merge_rawvcf.{chrm}.log'
-        threads: 4
+        threads: 44
         shell:
+            # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
             """
-            {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
+            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 100 --threads 11 --bcftools_threads 4 -r {wildcards.chrm} > {log} 2>&1
             """
 else : # no chr split
     rule merge_rawvcfs:
@@ -79,10 +80,11 @@ else : # no chr split
             vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
         log:
             'logs/3.2.merge_rawvcf.{chrm}.log'
-        threads: 4
+        threads: 44
         shell:
+            # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
             """
-            {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
+            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 100 --threads 11 --bcftools_threads 4 > {log} 2>&1
             """
 
 rule merge_same_pos:

@@ -79,6 +79,7 @@ GetOptions (
         'i|invcf=s' => \$invcf,
         'o|outvcf=s' => \$outvcf,
         'T|tmpdir=s' => \$tmp_dir,
+        'max_refalts_threshold=i' => \$max_refalts_threshold,
         'debug!' => \$debug,
 );
 
@@ -164,6 +165,7 @@ sub prase_line {
     my @ref_alts = ($ref, @alts);
     my $max_refaltsi = scalar(@ref_alts)-1;
     if ($force_cpx==0 and $max_refaltsi >= $max_refalts_threshold) {
+        say STDERR "Too much alleles at $F[0]:$F[1] ($max_refaltsi)! Keep this loc unchanged";
         return($line, 1);
     }
     #my $random = time() . "_" . rand();
@@ -180,6 +182,7 @@ sub buildline {
     my $max_allei = scalar(@$newseqs)-1;
     my $alts = join ",", $newseqs->@[1..$max_allei];
     $newline[4] = $alts;
+    $newline[4] = "*" if $newline[4] eq '';
     my $max_idi = scalar(@$F) - 1;
     foreach my $idi (9..$max_idi) {
         my $infos = $$F[$idi];
