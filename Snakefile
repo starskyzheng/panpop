@@ -67,7 +67,7 @@ rule cleanall:
         [ZTMPDIR] +
         ["2.callSV", "3.merge_rawvcf", "4.realign", "5.final_result" ] +
         ["6.aug_dp", "7.aug_merge_rawvcf", "8.aug_realign", "9.aug_final_result"] +
-        ["2.callSV.DPinfos.txt"] +
+        ["2.callSV.aug.DPinfos.txt"] + ["2.callSV.DPinfos.txt"] +
         ["logs"]
     shell:
         "rm -rf {params.rmfiles}"
