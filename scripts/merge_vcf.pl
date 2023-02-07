@@ -92,7 +92,8 @@ my $config = read_config_yaml("$Bin/../config.yaml");
 my $tabix = $$config{tabix};
 $bcftools //= $$config{bcftools};
 
-my $tmp_dir = &get_tmp_dir($tmp_dir_top, $noclean);
+my $tmp_dir_ = &get_tmp_dir($tmp_dir_top, $noclean);
+my $tmp_dir = $$tmp_dir_;
 my $vcfs = &read_list($inlist);
 my $lists = &split_filelist($vcfs, $vcfs_per_run);
 my $lists_files = &write_splitlist($lists, $tmp_dir);
@@ -108,11 +109,21 @@ exit;
 
 sub merge_vcfs2 {
     my ($vcfs, $final_vcf) = @_;
-    my $vcfs_str = join(" ", @$vcfs);
-    my $log = "$final_vcf.log";
-    my $cmd = "$bcftools merge $bcftools_appends --output-type z --output $final_vcf $vcfs_str";
-    system($cmd);
-    return $final_vcf;
+    my $vcfs_count = scalar(@$vcfs);
+    if($vcfs_count == 1) {
+        my $vcf = $$vcfs[0];
+        my $cmd = "cp $vcf $final_vcf";
+        system($cmd);
+        say STDERR "Only one vcf file, so just copy it to $final_vcf";
+        return $final_vcf;
+    } else {
+        my $vcfs_str = join(" ", @$vcfs);
+        my $log = "$final_vcf.log";
+        my $cmd = "$bcftools merge $bcftools_appends --output-type z --output $final_vcf $vcfs_str";
+        say STDERR $cmd;
+        system($cmd);
+        return $final_vcf;
+    }
 }
 
 
@@ -155,7 +166,7 @@ sub get_tmp_dir {
     my $ret = File::Temp->newdir( DIR => $dir, UNLINK => $unlink );
     $ret->unlink_on_destroy(0) if $noclean==1;
     say STDERR "tmp_dir: $ret";
-    return $ret;
+    return \$ret;
 }
 
 
