@@ -48,8 +48,8 @@ GetOptions (
         'b|backbone=s' => \$backbone,
         'o|out_dir=s' => \$outdir,
         't|threads=i' => \$threads,
-        'gfa=i' => \$gfa_in,
-        'rgfa=i' => \$rgfa_in,
+        'gfa=s' => \$gfa_in,
+        'rgfa=s' => \$rgfa_in,
 );
 
 my @moregenomes = @ARGV;
