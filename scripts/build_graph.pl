@@ -18,7 +18,7 @@ my $minigraph = $$config{minigraph} or die "minigraph not defined in config file
 
 
 my ($backbone, $outdir, $opt_help, $rgfa_in, $gfa_in);
-
+$outdir = '.';
 my $threads = 24;
 
 sub usage {
@@ -54,7 +54,7 @@ GetOptions (
 
 my @moregenomes = @ARGV;
 
-&usage() unless $outdir and $backbone and @moregenomes;
+
 
 die "can't use --gfa and --rgfa at the same time!" if defined $rgfa_in and defined $gfa_in;
 
@@ -67,15 +67,17 @@ my $gfa1 = "$outdir/1.original.rgfa";
 my $gfa2 = "$outdir/2.vg.gfa";
 my $gfa3 = "$outdir/3.final.gfa";
 
+$gfa1 = $rgfa_in if defined $rgfa_in;
+$gfa2 = $gfa_in if(defined $gfa_in);
+
 unless(defined $rgfa_in or defined $gfa_in) {
+    &usage() unless $outdir and $backbone and @moregenomes;
     &check_backbone($backbone);
     &check_dup_chrs($backbone, @moregenomes);
     my $cmd_build = "$minigraph -o $gfa1 --inv no -xggs -L 10 -K 4G -t $threads $backbone @moregenomes";
     say STDERR "Now start build graph, command is:";
     say STDERR $cmd_build;
     system($cmd_build);
-    $gfa1 = $rgfa_in if defined $rgfa_in;
-    $gfa2 = $gfa_in if(defined $gfa_in);
 }
 
 if(!defined $gfa_in) {
