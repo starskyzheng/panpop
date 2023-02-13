@@ -65,6 +65,7 @@ my $noclean = 0;
 my $bcftools_threads = 4;
 my $m_none=1;
 my $bcftools;
+my $verb = 0;
 
 GetOptions (
         'help|h!' => \$opt_help,
@@ -79,13 +80,14 @@ GetOptions (
         'chrome|r=s' => \$chrome,
         'bcftools_bin=s' => \$bcftools,
         'm_none=i' => \$m_none,
+        'verb|v!' => \$verb,
 );
 
 &help() if $opt_help;
 &help() unless($inlist && $out && $tmp_dir_top);
 
 my $bcftools_appends="--threads $bcftools_threads";
-$bcftools_appends .= " -m none --non_normalize_alleles" if $m_none==1;
+#$bcftools_appends .= " -m none --non_normalize_alleles" if $m_none==1;
 $bcftools_appends .= " --regions $chrome" if defined $chrome;
 
 my $config = read_config_yaml("$Bin/../config.yaml");
@@ -112,8 +114,8 @@ sub merge_vcfs2 {
     my $vcfs_count = scalar(@$vcfs);
     if($vcfs_count == 1) {
         my $vcf = $$vcfs[0];
-        my $cmd = "cp $vcf $final_vcf";
-        system($cmd);
+        my $cmd = "mv $vcf $final_vcf";
+        &run_cmd([$cmd], 1);
         say STDERR "Only one vcf file, so just copy it to $final_vcf";
         return $final_vcf;
     } else {
@@ -121,7 +123,7 @@ sub merge_vcfs2 {
         my $log = "$final_vcf.log";
         my $cmd = "$bcftools merge $bcftools_appends --output-type z --output $final_vcf $vcfs_str";
         say STDERR $cmd;
-        system($cmd);
+        &run_cmd([$cmd], 1);
         return $final_vcf;
     }
 }
@@ -135,7 +137,7 @@ sub merge_vcfs1 {
     foreach my $list_file (@$lists_files) {
         my $outvcf = "$list_file.vcf.gz";
         my $log = "$list_file.vcf.gz.log";
-        my $cmd = "$bcftools merge $bcftools_appends --output-type z --output $outvcf --file-list $list_file; $tabix $outvcf";
+        my $cmd = "$bcftools merge $bcftools_appends --output-type z --output $outvcf --file-list $list_file && $tabix $outvcf";
         push @ret_vcfs, $outvcf;
         push @cmds, $cmd;
     }
@@ -145,12 +147,24 @@ sub merge_vcfs1 {
 
 sub run_cmd {
     my ($cmds, $threads) = @_;
+    if($verb) {
+        say "Run cmd: $_" foreach @$cmds;
+    }
     MCE::Loop->init( max_workers => $threads, use_slurpio => 1, chunk_size => 1 );
-    mce_loop {
+    my @retcodes = mce_loop {
         my $cmd = $_;
-        system($cmd);
+        my $retcode = system($cmd);
+        if($retcode != 0) {
+            say STDERR "ERR!!! ret: $retcode : $cmd";
+        }
+        MCE->gather($retcode);
     } @$cmds;
     MCE::Loop->finish;
+    my $err = 0;
+    $err+=$_ foreach @retcodes;
+    if($err!=0) {
+        die "Error!! run_cmd return errors"
+    }
 }
 
 

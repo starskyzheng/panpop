@@ -352,7 +352,15 @@ sub process_line_new {
         say STDERR "No alts at $chr $win_start" if $debug;
         return undef;
     }
-    my ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length);
+    my ($muts);
+    my $ref_alt_max_length = $alt_max_length > $ref_len ? $alt_max_length : $ref_len;
+    if( ($ref_alt_max_length>1e3 and $max_alts>100)  or
+                      ($ref_alt_max_length>1e5)  or
+                      ($ref_alt_max_length>1000 and $alt_max_length>400) )  {
+        $muts = &process_alts($ref_alts, $max_alts, $alt_max_length, 'famsaP');
+    } else {
+        $muts = &process_alts($ref_alts, $max_alts, $alt_max_length);
+    }
     if (! defined $muts) {
         say STDERR "Fail to cal aln !! : ";
         return undef;

@@ -56,7 +56,7 @@ use vars qw(
 @EXPORT    = qw(process_alts aln_halign);
 
 
-
+my $famsa;
 my $HAlignC;
 my $muscle3;
 my $mafft;
@@ -69,6 +69,7 @@ my $init = 0;
 
 sub init {
     return if $init == 1;
+    $famsa = $main::config->{famsa} // confess "stmsa path not defined in config file";
     $HAlignC = $main::config->{stmsa} // confess "stmsa path not defined in config file";
     $muscle3 = $main::config->{muscle3} // undef;
     $mafft = $main::config->{mafft} // undef;
@@ -78,13 +79,15 @@ sub init {
 
     foreach my $refs ([$HAlignC, 'stmsa'], 
                       [$muscle3, 'muscle3'],
-                      [$mafft, 'mafft'])  {
+                      [$mafft, 'mafft'],
+                      [$famsa, 'famsa'] )  {
         my ($exe, $name) = @$refs;
         &check_bin_path($exe, $name) if defined $exe;
     }
 
     $ALN_PARAMS_max_tryi = $main::config->{realign_max_try_times_per_method};
-
+    $ALN_PARAMS{famsa} = "$famsa -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
+    $ALN_PARAMS{famsaP} = "$famsa -t 32 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
     $ALN_PARAMS{HAlignC} = "C";
     $ALN_PARAMS{mafft} = "$mafft --auto --thread 4 - 2>/dev/null" if $mafft;
     $ALN_PARAMS{muscle} = "$muscle3 -maxiters 16 -diags 2>/dev/null" if $muscle3;
@@ -100,9 +103,17 @@ sub check_bin_path {
 
 
 sub select_aln_software {
-    my ($lefti, $length) = @_;
+    my ($lefti, $length, $force_aln_method) = @_;
     my $next;
-    if ( $length > 0 and $$lefti{HAlignC}>0 ) { ##########
+    if (defined $force_aln_method and exists $$lefti{$force_aln_method} and $$lefti{$force_aln_method} > 0) {
+        my $tried = $ALN_PARAMS_max_tryi-$$lefti{$force_aln_method}+1;
+        $$lefti{$force_aln_method}--;
+        return($force_aln_method, $tried);
+    } elsif ( $length > 0 and $$lefti{famsa}>0 ) {
+        my $tried = $ALN_PARAMS_max_tryi-$$lefti{famsa}+1;
+        $$lefti{famsa}--;
+        return('famsa', $tried);
+    } elsif ( $length > 0 and $$lefti{HAlignC}>0 ) { ##########
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
         return('HAlignC', $tried);
@@ -180,7 +191,7 @@ sub aln_pipeline {
 
 
 sub process_alts {
-    my ($alts, $max_alts, $alt_max_length) = @_;
+    my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
     my %lefti;
     $lefti{$_}=$ALN_PARAMS_max_tryi foreach keys %ALN_PARAMS; # max try 3 times
     for(my $i=0; $i<scalar(@$alts); $i++) {
@@ -188,7 +199,7 @@ sub process_alts {
         $$alts[$i]='-' if $$alts[$i] eq '';
     }
     REDO_process_alts:
-    my ($selsoft, $tryi) = &select_aln_software(\%lefti, $alt_max_length);
+    my ($selsoft, $tryi) = &select_aln_software(\%lefti, $alt_max_length, $force_aln_method);
     return undef unless defined $selsoft;
     my ($aln_exit_status, $aln_alts);
     if ($selsoft =~/^HAlign/) {
