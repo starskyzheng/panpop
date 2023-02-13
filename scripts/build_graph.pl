@@ -17,7 +17,7 @@ my $vg = $$config{vg} or die "vg not defined in config file!";
 my $minigraph = $$config{minigraph} or die "minigraph not defined in config file!";
 
 
-my ($backbone, $outdir, $opt_help);
+my ($backbone, $outdir, $opt_help, $rgfa_in, $gfa_in);
 
 my $threads = 24;
 
@@ -27,6 +27,8 @@ sub usage {
     print STDERR <<"EOF";
 USAGE: perl $0 [options] [genomes]
 options:
+    --rgfa <file>                  rgfa file by minigraph as input (do not generate by fasta)
+    --gfa <file>                   gfa file by vg as input (do not generate by fasta)
     -b | --backbone <file>         Backbone genome file (in fasta)
     -o | --out_dir <file>          Output dir
     -t | --threads <int>           Number of threads (default: $threads)
@@ -46,14 +48,16 @@ GetOptions (
         'b|backbone=s' => \$backbone,
         'o|out_dir=s' => \$outdir,
         't|threads=i' => \$threads,
+        'gfa=i' => \$gfa_in,
+        'rgfa=i' => \$rgfa_in,
 );
 
 my @moregenomes = @ARGV;
 
 &usage() unless $outdir and $backbone and @moregenomes;
 
-&check_backbone($backbone);
-&check_dup_chrs($backbone, @moregenomes);
+die "can't use --gfa and --rgfa at the same time!" if defined $rgfa_in and defined $gfa_in;
+
 
 if (! -e $outdir) {
     mkdir $outdir or die "$outdir can not be created";
@@ -63,16 +67,24 @@ my $gfa1 = "$outdir/1.original.rgfa";
 my $gfa2 = "$outdir/2.vg.gfa";
 my $gfa3 = "$outdir/3.final.gfa";
 
-my $cmd_build = "$minigraph -o $gfa1 --inv no -xggs -L 10 -K 4G -t $threads $backbone @moregenomes";
+unless(defined $rgfa_in or defined $gfa_in) {
+    &check_backbone($backbone);
+    &check_dup_chrs($backbone, @moregenomes);
+    my $cmd_build = "$minigraph -o $gfa1 --inv no -xggs -L 10 -K 4G -t $threads $backbone @moregenomes";
+    say STDERR "Now start build graph, command is:";
+    say STDERR $cmd_build;
+    system($cmd_build);
+    $gfa1 = $rgfa_in if defined $rgfa_in;
+    $gfa2 = $gfa_in if(defined $gfa_in);
+}
 
-say STDERR "Now start build graph, command is:";
-say STDERR $cmd_build;
-system($cmd_build);
+if(!defined $gfa_in) {
+    my $cmd_gfa2vg = "$vg convert --gfa-out --gfa-in $gfa1 > $gfa2";
+    say STDERR "Now covert gfa, command is:";
+    say STDERR $cmd_gfa2vg;
+    system($cmd_gfa2vg);
+}
 
-my $cmd_gfa2vg = "$vg convert --gfa-out --gfa-in $gfa1 > $gfa2";
-say STDERR "Now covert gfa, command is:";
-say STDERR $cmd_gfa2vg;
-system($cmd_gfa2vg);
 
 
 
@@ -87,6 +99,7 @@ say STDERR "===========================";
 say STDERR "===========================";
 
 exit;
+
 
 sub mod_vg_gfa {
     my ($in, $out) = @_;
