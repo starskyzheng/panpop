@@ -24,6 +24,7 @@
 ```sh
 git clone https://github.com/StarSkyZheng/panpop.git
 cd panpop
+cp config.x64.yaml config.yaml
 snakemake -j 3 --reason --printshellcmds
 ```
   Results located in `example/5.final_result` or `example/9.aug_final_result` for augment mode.
