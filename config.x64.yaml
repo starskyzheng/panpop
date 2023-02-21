@@ -17,6 +17,7 @@ graph: 'Ref'
 ## absolute paths are recommended instead of relative paths
 ## amd64
 # required:
+famsa: "misc/famsa"
 stmsa: "misc/stmsa_0.2.1-ubuntu.20.04_amd64.out"
 bcftools: "misc/bcftools"
 vg: "misc/vg"
@@ -30,20 +31,6 @@ muscle3: "misc/muscle"
 minigraph: "misc/minigraph"
 seqs2identity: ""
 
-## ARM64
-# required:
-#stmsa: "misc_arm/stmsa"
-#bcftools: "misc_arm/bcftools"
-#vg: "misc_arm/vg"
-#tabix: "misc_arm/tabix"
-#bgzip: "misc_arm/bgzip"
-#seqs2identity: "src/gotoh/align"
-## optional but highly recommanded:
-#mafft: ""
-#muscle3: "misc/muscle"
-#seqs2identity: ""
-# only for build_graph.pl
-#minigraph: "misc/minigraph"
 
 
 #################### Filter Parameters ####################
