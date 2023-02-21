@@ -69,7 +69,7 @@ my $init = 0;
 
 sub init {
     return if $init == 1;
-    $famsa = $main::config->{famsa} // confess "stmsa path not defined in config file";
+    $famsa = $main::config->{famsa} // confess "famsa path not defined in config file";
     $HAlignC = $main::config->{stmsa} // confess "stmsa path not defined in config file";
     $muscle3 = $main::config->{muscle3} // undef;
     $mafft = $main::config->{mafft} // undef;
