@@ -48,7 +48,7 @@ my ($infile, $outfile, $opt_help, $ref_fasta_file);
 our $tmp_dir_def = '/run/user/' . `id -u`; chomp $tmp_dir_def;
 our $debug = 0;
 our $verb = 0;
-our $align_level = 1;
+our $align_level = 2;
 my $is_aug = 0;
 my $ext_bp_max = 10;
 my $ext_bp_min = 1;
@@ -74,7 +74,7 @@ options:
     -h | --help                    Print this help
     --verb <bool>
     --all <bool>                   Print lines even no mutation.
-    --level <1|2>
+    --level <1|2>                  Level 1 only split muts by non-mut non-missing blocks
 EOF
     exit(1);
 }
@@ -240,19 +240,25 @@ sub zz_mce_producer {
     my $end_real;
     my $chr_old;
     my $iline=1;
-    while(<$I>) {
-        chomp;
-        next if /^#/;
-        next unless $_;
+    while(my $line = <$I>) {
+        chomp $line;
+        next if $line=~/^#/;
+        next unless $line;
         my $snpid = $.;
         #my $snpid = "$F[0]:$F[1]"; # may not unique
-        my @F = split(/\t/, $_);
+        my @F = split(/\t/, $line);
         next if $F[4] eq '';
         my $chr = $F[0];
         my $pos = $F[1];
         my $ref_seq = $F[3];
         my @alts = split(/,/, $F[4]);
         $F[4] = \@alts;
+        if ($align_level==2) {
+            $end_real = $pos + length($ref_seq) - 1;
+            $queue->enqueue( $iline, [[\@F], $chr, $pos, $end_real]);
+            $iline++;
+            next;
+        }
         # next if $pos < 14999102; ######### debug
         #next if exists $SKIPCHR{$F[0]};
         unless (defined $chr_old) { # init
@@ -338,7 +344,7 @@ sub process_line_new {
         $alt_max_length = $len if $alt_max_length < $len;
         $alt_min_length = $len if $alt_min_length > $len;
     }
-    if ($is_snp==1 or $alt_min_length<=1) { ########## SNP
+    if ($is_snp==1 or scalar(@$ref_alts)==2) { ########## SNP #  or $alt_min_length<=1
         my $retline = &gen_lines_before_process($ids2alles, $ref_alts, 
                                                     $chr, $win_start);
         if ($retline) {
@@ -513,7 +519,9 @@ sub rebuild_cons_seqs {
     say STDERR "Debug: phase: @phase_issue_ids" if ($debug>=1 and @phase_issue_ids);
     my @new_ref_alts;
     push @new_ref_alts, $_ foreach sort {$new_ref_alts{$a}<=>$new_ref_alts{$b}} keys %new_ref_alts;
-    return(\@new_ref_alts, \%new_ids2alles);
+    #say STDERR Dumper \%new_ref_alts;
+    #die;
+   return(\@new_ref_alts, \%new_ids2alles);
 }
 
 

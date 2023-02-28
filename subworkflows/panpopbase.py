@@ -70,7 +70,7 @@ if config['split_chr']==True:
         shell:
             # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
             """
-            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 -r {wildcards.chrm} > {log} 2>&1
+            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 -r {wildcards.chrm} --m_none 0 >> {log} 2>&1
             """
 else : # no chr split
     rule merge_rawvcfs:
@@ -84,7 +84,7 @@ else : # no chr split
         shell:
             # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
             """
-            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 > {log} 2>&1
+            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 --m_none 0 >> {log} 2>&1
             """
 
 rule merge_same_pos:
@@ -99,7 +99,7 @@ rule merge_same_pos:
         mem_mb=2000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_vcf_same_pos.pl --invcf {input.vcf} --outvcf {output.vcf} --threads {threads} > {log} 2>&1
+        perl {workflow.basedir}/scripts/merge_vcf_same_pos.pl --invcf {input.vcf} --outvcf {output.vcf} --threads {threads} >> {log} 2>&1
         """
 
 rule filter_raw_vcf:
@@ -119,7 +119,7 @@ rule filter_raw_vcf:
         mad_min_fold = config['mad_min_fold'],
     shell:
         """
-        perl {workflow.basedir}/scripts/flt_raw_vcfs.pl --invcf {input.vcf} --outvcf {output.vcf} --miss_threshold 1 --threads {threads} --dp_min_fold {params.dp_min_fold} --dp_max_fold {params.dp_max_fold} --mad_min_fold {params.mad_min_fold} --depth_file {input.depthfile} --remove_fail > {log} 2>&1
+        perl {workflow.basedir}/scripts/flt_raw_vcfs.pl --invcf {input.vcf} --outvcf {output.vcf} --miss_threshold 1 --threads {threads} --dp_min_fold {params.dp_min_fold} --dp_max_fold {params.dp_max_fold} --mad_min_fold {params.mad_min_fold} --depth_file {input.depthfile} --remove_fail >> {log} 2>&1
         """
 
 # Realign
@@ -141,7 +141,7 @@ rule realign1:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  > {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 2 >> {log} 2>&1
         {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
@@ -158,7 +158,7 @@ rule filter_maf1:
         max_miss_freq = config['max_missing_rate']
     shell:
         """
-        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} > {log} 2>&1
+        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} >> {log} 2>&1
         """
 
 
@@ -180,8 +180,8 @@ rule realign2:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  > {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 2 >> {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 rule filter_maf2:
@@ -197,7 +197,25 @@ rule filter_maf2:
         max_miss_freq = config['max_missing_rate']
     shell:
         """
-        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} > {log} 2>&1
+        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} >> {log} 2>&1
+        """
+
+rule sv2pav:
+    input:
+        vcf = '4.realign/4.filter_maf1.{chrm}.vcf.gz',
+    output:
+        vcf = '4.realign/5.pav.{chrm}.vcf.gz',
+        vcf_sorted = '4.realign/5.pav.{chrm}.sorted.vcf.gz',
+    log:
+        'logs/4.5.sv2pav.{chrm}.vcf.gz.log'
+    threads: config['cores_realign']
+    params:
+        tmpdir = config['memory_tmp_dir'],
+        sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold']
+    shell:
+        """
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} >> {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 # Finally
@@ -217,7 +235,7 @@ rule split_vcf_by_type:
     shell:
         """
         cp {input.vcf} {output.vcf_all}
-        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
+        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
         """
 
 
@@ -232,8 +250,24 @@ rule merge_vcf_splitchrs:
         'logs/5.1.merge.log'
     shell:
         """
-        {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} > {log} 2>&1
+        {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} >> {log} 2>&1
         """
+
+
+rule merge_vcf_splitchrs_pav:
+    input:
+        vcfs = expand('4.realign/5.pav.{chrm}.sorted.vcf.gz', chrm=CHRS),
+    output:
+        vcf = '5.final_result/1.final_mergechr.all.pav.vcf.gz'
+    threads:
+        6
+    log:
+        'logs/5.1.pav.merge.log'
+    shell:
+        """
+        {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} >> {log} 2>&1
+        """
+
 
 rule split_vcf_by_type_splitchr:
     input:
@@ -249,5 +283,5 @@ rule split_vcf_by_type_splitchr:
         min_sv_len = config['SV_min_length']
     shell:
         """
-        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
+        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
         """

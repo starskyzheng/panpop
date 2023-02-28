@@ -106,7 +106,7 @@ my $lines_cpx = MCE::Shared->array();
 
 if ($threads==1) {
     while(my $line = <$I>) {
-        my $result = &prase_line($line);
+        my ($result) = &prase_line($line);
         say $O $result if $result;
     }
 } else {
@@ -141,7 +141,7 @@ sub flt_mce {
     my ($result, $is_cpx) = &prase_line($$chunk_ref[0], 1, 0);
     if ($is_cpx==1) {
         $lines_cpx->push($result);
-        return();
+        $mce->gather($chunk_id);
     } else {
         if (defined $result) {
             $mce->gather($chunk_id, $result, "\n");

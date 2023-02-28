@@ -30,6 +30,8 @@ use List::Util qw/max min/;
 use Data::Dumper;
 use Carp qw/confess carp/; # carp=warn;confess=die
 use IPC::Open2;
+#use Clone qw(clone);
+use Storable qw(dclone);
 
 require Exporter;
 
@@ -109,11 +111,15 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{$force_aln_method}+1;
         $$lefti{$force_aln_method}--;
         return($force_aln_method, $tried);
-    } elsif ( $length > 0 and $$lefti{famsa}>0 ) {
+    } elsif ( $length<100 and exists $$lefti{muscle} and $$lefti{muscle}>0) {
+        my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
+        $$lefti{muscle}--;
+        return('muscle', $tried);
+    } elsif ( $$lefti{famsa}>0 ) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{famsa}+1;
         $$lefti{famsa}--;
         return('famsa', $tried);
-    } elsif ( $length > 0 and $$lefti{HAlignC}>0 ) { ##########
+    } elsif ( $$lefti{HAlignC}>0 ) { ##########
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
         return('HAlignC', $tried);
@@ -175,13 +181,18 @@ sub aln_pipeline {
     my ($selsoft, $alts, $max_alts) = @_;
     my $aln_param = $ALN_PARAMS{$selsoft} // confess();
     my $aln_pid = open2(my $chld_out, my $chld_in, "$aln_param");
+    my @empty_ialt;
     foreach my $ialt(0..$max_alts) {
-        my $alt = $$alts[$ialt];
+        my $alt_seq = $$alts[$ialt];
+        if($alt_seq eq "" or $alt_seq eq '-' or $alt_seq eq '*') {
+            push @empty_ialt, $ialt;
+            next;
+        }
         say $chld_in ">$ialt";
-        say $chld_in $alt;
+        say $chld_in $alt_seq;
     }
     close $chld_in;
-    my $aln_alts = &read_fa_fh($chld_out);
+    my $aln_alts = &read_fa_fh($chld_out, \@empty_ialt);
     waitpid( $aln_pid, 0 );
     my $aln_exit_status = $? >> 8;
     return($aln_exit_status, $aln_alts);
@@ -192,6 +203,12 @@ sub aln_pipeline {
 
 sub process_alts {
     my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
+    #say STDERR "Ori no align alts: " . Dumper $alts;
+    #say STDERR $max_alts;
+    if($max_alts==1) { # biallic, to skip calculation
+        my %ret = (0=>$alts);
+        return(\%ret, length($$alts[0]));
+    }
     my %lefti;
     $lefti{$_}=$ALN_PARAMS_max_tryi foreach keys %ALN_PARAMS; # max try 3 times
     for(my $i=0; $i<scalar(@$alts); $i++) {
@@ -211,8 +228,9 @@ sub process_alts {
         carp "Warn! no alt[0] from aln software($selsoft)! redo! No. $tryi";
         goto REDO_process_alts;
     }
-    say STDERR Dumper($aln_alts) if $debug;
+    #say STDERR "align: " . Dumper($aln_alts);
     my ($muts, $aln_seqlen) = &alt_alts_to_muts($aln_alts, $max_alts);
+    #say STDERR Dumper $muts if $debug;
     return($muts, $aln_seqlen);
 }
 
@@ -221,12 +239,12 @@ sub process_alts {
 sub alt_alts_to_muts {
     # $mut{ipos}[ialt] = seq
     my ($alts, $max_alts) = @_; # aln_alts
-    #say STDERR Dumper $alts;
+    say STDERR Dumper $alts;
     my @tie_seqs;
     my %muts;
     my $aln_seqlen = length( $$alts[0] );
     foreach my $ialt (0..$max_alts) {
-        my $seq = $$alts[$ialt];
+        my $seq = $$alts[$ialt] // die $ialt;
         my $l = length($seq);
         confess("length:  $l != $aln_seqlen") if $l != $aln_seqlen;
         tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
@@ -236,22 +254,20 @@ sub alt_alts_to_muts {
     my $ref_missn=0;
     my $old_sarray=[];
     my $is_ref_miss_at_start=0;
-    my $old_changearray = [];
     my ($last_nomiss_pos, $last_nomiss_sarray) = (0, []);
     for (my $i = 0; $i < $aln_seqlen; $i++) {
         my $sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 1);
         my ($is_same_now, $is_miss_now, $is_ref_miss_now) = &sarray_is_same_miss($sarray, $max_alts);
         say STDERR "!!" . " $i " . ($i-$ref_missn) . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, is_miss$is_miss" if $debug;
-        my $changearray = [];
-        $changearray = &sarray_diff_array($old_sarray, $sarray) if $i>0;
         if ($is_miss_now==1) {
             $ref_missn++ if $is_ref_miss_now;
             if ($is_miss==1) {
                 # continue missing
                 if ($align_level==2) {
-                    my $diff_is_same = &numarray_is_same($old_changearray, $changearray);
+                    my $diff_is_same = &cal_sarray_is_compatible($old_sarray, $sarray);
                     if ( $diff_is_same==0 and length($$old_sarray[0])>0 and 
                             $is_ref_miss_now==0 ) {
+                        # not compatible, end missing, start new missing
                         $muts{$miss_start} = $old_sarray;
                         $miss_start = $i - $ref_missn;
                         $old_sarray = [];
@@ -314,7 +330,6 @@ sub alt_alts_to_muts {
                 confess();
             }
         }
-        $old_changearray = $changearray;
     }
     if (@$old_sarray and $miss_start>=0) {
         if ( length($$old_sarray[0])==0 ) {
@@ -334,11 +349,222 @@ sub alt_alts_to_muts {
             $muts{$miss_start} = $old_sarray;
         }
     }
-    say STDERR "!!muts: " . Dumper \%muts if $debug;
+    say STDERR "!!muts: " . Dumper \%muts;
+    &merge_alle_afterall(\%muts, $$alts[0]); # 合并可以合并的兼容的位点
+    #die Dumper $alts;
     return (\%muts, $aln_seqlen);
 }
 
 
+sub merge_alle_afterall {
+    my ($muts, $refseq) = @_;
+    $refseq=~s/-//g;
+    my %i2groups;
+    my $igroups = 0;
+    my @is = sort {$a<=>$b}keys %$muts;
+    #say STDERR Dumper $muts;
+    return if scalar(@is)<=1;
+    my %spectrums;
+    my @groups2i;
+    my $old_spectrum = &cal_sarray_mut_spectrum($$muts{$is[0]});
+    push $groups2i[0]->@*, $is[0];
+    foreach my $i (1..$#is) {
+        my $pos = $is[$i];
+        my $spectrums = &cal_sarray_mut_spectrum($$muts{$pos});
+        if($spectrums eq $old_spectrum) {
+            push $groups2i[$#groups2i]->@*, $pos;
+        } else {
+            push $groups2i[1+$#groups2i]->@*, $pos;
+            $old_spectrum = $spectrums;
+        }
+    }
+    say STDERR "groups2i: " . Dumper \@groups2i;
+    say STDERR "Before, muts: " . Dumper $muts;;
+    ### start to merge
+    foreach my $g (reverse 0..$#groups2i) {
+        my @is_now = $groups2i[$g]->@*;
+        next if scalar(@is_now)==1;
+        &merge_alle_afterall_update($muts, \@is_now, $refseq);
+    }
+    say STDERR "After, muts: " . Dumper $muts;;
+    #die Dumper $muts;
+}
+
+sub merge_alle_afterall_update {
+    my ($muts, $i_to_merge, $refseq) = @_;
+    my $min_i = min(@$i_to_merge);
+    my $max_i = max(@$i_to_merge);
+    my $nalts = scalar($$muts{$min_i}->@*);
+    my $max_ilen = length($$muts{$max_i}[0]);
+    my $len = $max_i + $max_ilen - $min_i + 1;
+    my $refseq_now = substr($refseq, $min_i, $len);
+    my @mut;
+    push @mut, $refseq_now for(0..$nalts-1);
+    #say STDERR Dumper $muts;
+    #say STDERR "REF: $refseq_now";
+    foreach my $i (sort {$b<=>$a} @$i_to_merge) {
+        my $mut_reflen = length($$muts{$i}[0]);
+        for my $allei (0..$nalts-1) {
+            #say STDERR join(" - ",$mut[$allei], $i, $min_i, $len, $$muts{$i}[$allei]);
+            substr($mut[$allei], $i-$min_i, $mut_reflen, $$muts{$i}[$allei]);
+        }
+        delete $$muts{$i};
+    }
+    $$muts{$min_i} = \@mut;
+}
+
+
+=error not use
+sub alt_alts_to_muts_notuse {
+    # $mut{ipos}[ialt] = seq
+    my ($alts, $max_alts) = @_; # aln_alts
+    say STDERR Dumper $alts;
+    my @tie_seqs;
+    my %muts;
+    my $aln_seqlen = length( $$alts[0] );
+    foreach my $ialt (0..$max_alts) {
+        my $seq = $$alts[$ialt];
+        my $l = length($seq);
+        confess("length:  $l != $aln_seqlen") if $l != $aln_seqlen;
+        tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
+    }
+    my $old_sarray = [];
+    my $mut_in_ref_pos = 0;
+    my $now_pos_in_ref = -1;
+    my $toadd_sarray;
+    my $toadd_posinref;
+    my $toadd_sarray_ext;
+    for (my $i = 0; $i < $aln_seqlen; $i++) {
+        my $sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 0);
+        #say STDERR Dumper $sarray;
+        #say STDERR Dumper $old_sarray;
+        #say STDERR '--';
+        my ($is_same_now, $is_miss_now, $is_ref_miss_now) = &sarray_is_same_miss($sarray, $max_alts);
+        $now_pos_in_ref++ if $is_ref_miss_now==0; # now_pos_in_ref 不对 23x?
+        #say STDERR "!!" . " $i " . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, now_pos_in_ref$now_pos_in_ref" ;
+        if($is_same_now==1) { # this site has no mut
+            if(scalar(@$old_sarray)>0) { # has mut before
+                if($$old_sarray[0] eq '') { # ref is start with missing, must extend
+                    &append_sarray($old_sarray, $sarray);
+                } else { # to end mut
+                    if(defined $toadd_posinref) { # continue extend 战未来
+                        &append_sarray($toadd_sarray_ext, $sarray);
+                    } else { # init 战未来
+                        #die Dumper $old_sarray;
+                        $toadd_sarray = dclone($old_sarray);
+                        $toadd_sarray_ext = dclone($old_sarray);
+                        $toadd_posinref = $mut_in_ref_pos;
+                        &append_sarray($toadd_sarray_ext, $sarray);
+                    }
+                    $old_sarray = [];
+                    $mut_in_ref_pos = -9;
+                }
+                say STDERR Dumper $sarray;
+                say STDERR "2>; " . Dumper $toadd_sarray_ext;
+            }
+        } else { # now in mut
+            if(scalar(@$old_sarray)>0) { # has mut before
+                my $compat = &cal_sarray_is_compatible($old_sarray, $sarray);
+                my $compat_toadd = &cal_sarray_is_compatible($toadd_sarray_ext, $sarray);
+                say STDERR "Now: $i " . Dumper $toadd_sarray_ext;
+                if ($compat==1) { # compat, to extend
+                    &append_sarray($old_sarray, $sarray);
+                    &append_sarray($toadd_sarray_ext, $sarray);
+                } else { # not compat
+                    if($is_ref_miss_now==1) { # ref miss, must extend
+                        #say STDERR "! $is_ref_miss_now " . Dumper $old_sarray;
+                        &append_sarray($old_sarray, $sarray);
+                        &append_sarray($toadd_sarray_ext, $sarray);
+                    } else { # refseq not miss now, to end mut
+                        if($$old_sarray[0] eq '') { # refseq miss since start
+                            # merge with this mut
+                            &append_sarray($old_sarray, $sarray);
+                            &append_sarray($toadd_sarray_ext, $sarray);
+                        } else { # to end old mut, start new mut
+                            if(defined $toadd_posinref and ! @$old_sarray) {
+                                $muts{$toadd_posinref} = $toadd_sarray;
+                                say STDERR "290: toadd_sarray: " . Dumper $toadd_sarray;
+                                $toadd_sarray = undef;
+                                $toadd_posinref = undef;
+                            } elsif(defined $toadd_posinref and @$old_sarray) {
+                                # combine two mut
+                                say STDERR "??". Dumper $toadd_sarray_ext;
+                                $muts{$toadd_posinref} = $toadd_sarray_ext;
+                                say STDERR "295: toadd_sarray: " . Dumper $toadd_sarray;
+                                $toadd_sarray = undef;
+                                $toadd_posinref = undef;
+                            }
+                            $old_sarray = $sarray;
+                            $mut_in_ref_pos = $now_pos_in_ref;
+                        }
+                    }
+                }
+            } elsif($i==0) { # mut in first pos
+                $old_sarray = $sarray;
+                $mut_in_ref_pos = 0;
+            } else { # no mut before
+                $old_sarray = $sarray;
+                &append_sarray($toadd_sarray_ext, $sarray);
+                $mut_in_ref_pos = $now_pos_in_ref;
+            }
+        }
+    }
+
+    if(defined $toadd_posinref) {
+        #die $toadd_posinref;
+        say STDERR "!!1" .  Dumper $toadd_sarray;
+        $muts{$toadd_posinref} = $toadd_sarray;
+        $toadd_sarray = undef;
+        $toadd_posinref = undef;
+    }
+    if (@$old_sarray) {
+        say STDERR "!!2" .  Dumper $old_sarray;
+        if ( length($$old_sarray[0])==0 ) {
+            # 最后一个SV的ref是空的，将序列补到倒数第二个上
+            my $last_pos_start = max(keys %muts);
+            if (! defined $last_pos_start) {
+                confess "last_pos_start is undef @$old_sarray";
+            }
+            &append_sarray( $muts{$last_pos_start} , $old_sarray);
+        } else {
+            $muts{$now_pos_in_ref} = $old_sarray;
+        }
+    }
+    say STDERR "!!muts: " . Dumper \%muts if $debug;
+    say STDERR Dumper \%muts;
+    #die;
+    return (\%muts, $aln_seqlen);
+}
+=cut
+
+sub cal_sarray_mut_spectrum {
+    my ($sarray) = @_;
+    my %alle2i;
+    my $now_allei = 0;
+    my $spectrum = '';
+    foreach my $alle (@$sarray) {
+        if(!exists $alle2i{$alle}) { # new alle
+            $alle2i{$alle} = $now_allei;
+            $spectrum .= $now_allei;
+            $now_allei++;
+        } else { # exists alle
+            my $i = $alle2i{$alle};
+            $spectrum .= $i;
+        }
+    }
+    return($spectrum);
+}
+
+sub cal_sarray_is_compatible {
+    my ($sarray1, $sarray2) = @_;
+    my $spectrum1 = &cal_sarray_mut_spectrum($sarray1);
+    my $spectrum2 = &cal_sarray_mut_spectrum($sarray2);
+    if ($spectrum1 eq $spectrum2) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
 
 sub append_sarray {
@@ -388,7 +614,7 @@ sub sarray_is_same_miss {
     my $first = $$sarray[0];
 
     my $is_ref_miss=0;
-    if ($first eq '-') {
+    if ($first eq '-' or $first eq '') {
         $is_ref_miss=1;
     }
     my %seqs;
@@ -397,11 +623,12 @@ sub sarray_is_same_miss {
         $seqs{$seq}++;
     }
     my $is_miss = 0;
-    if (exists $seqs{'-'}) {
+    if (exists $seqs{'-'} or exists $seqs{''}) {
         $is_miss=1;
-        delete $seqs{'-'};
+        #delete $seqs{'-'};
     }
     my $is_same = scalar(keys %seqs)>1 ? 0 : 1 ;
+    #die Dumper \%seqs;
     return ($is_same, $is_miss, $is_ref_miss);
 }
 
@@ -434,7 +661,7 @@ sub numarray_is_same {
 
 sub read_fa_fh {
     # seqids MUST be integers
-    my ($fh) = @_;
+    my ($fh, $empty_ialts) = @_;
     my %seqs;
     my $seqid_now='NA';
     while (<$fh>) {
@@ -447,6 +674,10 @@ sub read_fa_fh {
         $seqs{$seqid_now} .= $_;
     }
     close $fh;
+    my $len = length($seqs{0});
+    foreach my $ialt (@$empty_ialts) {
+        $seqs{$ialt} = '-' x $len;
+    }
     my @seqids = sort {$a<=>$b} keys %seqs;
     return( [ @seqs{@seqids} ] );
 }
