@@ -220,35 +220,15 @@ rule sv2pav:
         sv_min_dp = config['SV_min_length']
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} >> {log} 2>&1
-        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf} --outvcf {output.vcf2} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} --threads {threads} >> {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf1} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} --threads {threads} >> {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf2_sorted} -O z {output.vcf2} >> {log} 2>&1
         """
 
 # Finally
-rule split_vcf_by_type: # for non-split-chr
+rule split_vcf_by_type2: # for non-split-chr
     input:
-        vcf = '4.realign/4.filter_maf1.{chrm}.vcf.gz'
-    output:
-        vcf_all = '5.final_result/1.final.{chrm}.all.vcf.gz',
-        vcf_snp = '5.final_result/2.final.{chrm}.snp.vcf.gz',
-        vcf_indel = '5.final_result/2.final.{chrm}.indel.vcf.gz',
-        vcf_sv = '5.final_result/2.final.{chrm}.sv.vcf.gz'
-    log:
-        'logs/5.split_vcf.{chrm}.log'
-    params:
-        outprefix = '5.final_result/2.final.{chrm}',
-        min_sv_len = config['SV_min_length']
-    shell:
-        """
-        cp {input.vcf} {output.vcf_all}
-        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
-        """
-
-# Finally
-rule split_vcf_by_type: # for non-split-chr
-    input:
-        vcf = '5.final_result/{filename}.vcf.gz'
+        vcf = '5.final_result/{filename}.all.vcf.gz'
     output:
         vcf_snp = '5.final_result/{filename}.snp.vcf.gz',
         vcf_indel = '5.final_result/{filename}.indel.vcf.gz',
@@ -258,14 +238,13 @@ rule split_vcf_by_type: # for non-split-chr
         min_sv_len = config['SV_min_length']
     shell:
         """
-        cp {input.vcf} {output.vcf_all}
         perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len}
         """
 
 if config['split_chr']==False:
     rule cp_to_final:
         input: 
-            vcf1 = '4.realign/2.2.pav2.all.sorted.vcf.gz'
+            vcf1 = '4.realign/2.2.pav2.all.sorted.vcf.gz',
             vcf2 = '4.realign/4.filter_maf1.all.vcf.gz',
         output:
             vcf1 = '5.final_result/1.final_mergechr.all.vcf.gz',
