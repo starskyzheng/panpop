@@ -203,7 +203,7 @@ sub aln_pipeline {
 
 sub process_alts {
     my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
-    #say STDERR "Ori no align alts: " . Dumper $alts;
+    say STDERR "Ori no align alts: " . Dumper $alts if $debug;
     #say STDERR $max_alts;
     if($max_alts==1) { # biallic, to skip calculation
         my %ret = (0=>$alts);
@@ -228,9 +228,8 @@ sub process_alts {
         carp "Warn! no alt[0] from aln software($selsoft)! redo! No. $tryi";
         goto REDO_process_alts;
     }
-    #say STDERR "align: " . Dumper($aln_alts);
+    say STDERR "alignd alts: " . Dumper($aln_alts) if $debug;
     my ($muts, $aln_seqlen) = &alt_alts_to_muts($aln_alts, $max_alts);
-    #say STDERR Dumper $muts if $debug;
     return($muts, $aln_seqlen);
 }
 
@@ -239,7 +238,7 @@ sub process_alts {
 sub alt_alts_to_muts {
     # $mut{ipos}[ialt] = seq
     my ($alts, $max_alts) = @_; # aln_alts
-    say STDERR Dumper $alts;
+    #say STDERR Dumper $alts;
     my @tie_seqs;
     my %muts;
     my $aln_seqlen = length( $$alts[0] );
@@ -256,6 +255,8 @@ sub alt_alts_to_muts {
     my $is_ref_miss_at_start=0;
     my ($last_nomiss_pos, $last_nomiss_sarray) = (0, []);
     for (my $i = 0; $i < $aln_seqlen; $i++) {
+        #if(exists $$old_sarray[0] and $$old_sarray[0] eq 'CGGT') {die;}
+        #say STDERR $$old_sarray[0] if exists $$old_sarray[0];
         my $sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 1);
         my ($is_same_now, $is_miss_now, $is_ref_miss_now) = &sarray_is_same_miss($sarray, $max_alts);
         say STDERR "!!" . " $i " . ($i-$ref_missn) . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, is_miss$is_miss" if $debug;
@@ -267,8 +268,9 @@ sub alt_alts_to_muts {
                     my $diff_is_same = &cal_sarray_is_compatible($old_sarray, $sarray);
                     if ( $diff_is_same==0 and length($$old_sarray[0])>0 and 
                             $is_ref_miss_now==0 ) {
-                        # not compatible, end missing, start new missing
+                        # not compatible, end missing. then start new missing
                         $muts{$miss_start} = $old_sarray;
+                        #say STDERR Dumper \%muts;
                         $miss_start = $i - $ref_missn;
                         $old_sarray = [];
                         $is_miss = 0;
@@ -322,7 +324,8 @@ sub alt_alts_to_muts {
             $last_nomiss_sarray = $sarray;
             if ($is_same_now==0) { # with $is_miss_now==0 and $is_miss==0 and $is_ref_miss_at_start==0
                 # not same
-                $muts{$i - $ref_missn} = $sarray;
+                my $now_i = $i - $ref_missn;
+                $muts{$now_i} = $sarray;
                 $is_miss = 0 if $is_miss==1;
             } elsif ($is_same_now==1) {
                 # do nothing;
@@ -349,7 +352,7 @@ sub alt_alts_to_muts {
             $muts{$miss_start} = $old_sarray;
         }
     }
-    say STDERR "!!muts: " . Dumper \%muts;
+    # say STDERR "!!muts: " . Dumper \%muts;
     &merge_alle_afterall(\%muts, $$alts[0]); # 合并可以合并的兼容的位点
     #die Dumper $alts;
     return (\%muts, $aln_seqlen);
@@ -378,15 +381,15 @@ sub merge_alle_afterall {
             $old_spectrum = $spectrums;
         }
     }
-    say STDERR "groups2i: " . Dumper \@groups2i;
-    say STDERR "Before, muts: " . Dumper $muts;;
+    #say STDERR "groups2i: " . Dumper \@groups2i;
+    #say STDERR "Before, muts: " . Dumper $muts;;
     ### start to merge
     foreach my $g (reverse 0..$#groups2i) {
         my @is_now = $groups2i[$g]->@*;
         next if scalar(@is_now)==1;
         &merge_alle_afterall_update($muts, \@is_now, $refseq);
     }
-    say STDERR "After, muts: " . Dumper $muts;;
+    #say STDERR "After, muts: " . Dumper $muts;;
     #die Dumper $muts;
 }
 
@@ -396,7 +399,7 @@ sub merge_alle_afterall_update {
     my $max_i = max(@$i_to_merge);
     my $nalts = scalar($$muts{$min_i}->@*);
     my $max_ilen = length($$muts{$max_i}[0]);
-    my $len = $max_i + $max_ilen - $min_i + 1;
+    my $len = $max_i + $max_ilen - $min_i;
     my $refseq_now = substr($refseq, $min_i, $len);
     my @mut;
     push @mut, $refseq_now for(0..$nalts-1);
@@ -418,7 +421,7 @@ sub merge_alle_afterall_update {
 sub alt_alts_to_muts_notuse {
     # $mut{ipos}[ialt] = seq
     my ($alts, $max_alts) = @_; # aln_alts
-    say STDERR Dumper $alts;
+    #say STDERR Dumper $alts;
     my @tie_seqs;
     my %muts;
     my $aln_seqlen = length( $$alts[0] );

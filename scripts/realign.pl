@@ -253,7 +253,7 @@ sub zz_mce_producer {
         my $ref_seq = $F[3];
         my @alts = split(/,/, $F[4]);
         $F[4] = \@alts;
-        if ($align_level==2) {
+        if ($align_level==2) { # align_level==2, not merge lines
             $end_real = $pos + length($ref_seq) - 1;
             $queue->enqueue( $iline, [[\@F], $chr, $pos, $end_real]);
             $iline++;
@@ -476,6 +476,7 @@ sub rebuild_cons_seqs {
             $alt_svs++;
             for(my $p=$sv_start; $p<=$sv_end; $p++) {
                 if (exists $sites_status{$p} and $sites_status{$p} == 1) {
+                    say STDERR "!!!! $ref ;\n$a1 ; \n$a2";
                     die "DIE! chr:$chr, wins:$win_start, wine:$win_end, pos:$p, idi:$idi, line:$iline, alles:$$alles[0], $$alles[1]";
                 } else {
                     $sites_status{$p}=1;

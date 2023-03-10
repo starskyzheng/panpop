@@ -48,13 +48,15 @@ my($in_vcf, $opt_help);
 my $thread='auto';
 my $out_file = '-';
 
+my $dp_min_abs = 3;
+my $mad_min_abs = 1;
 my $dp_min_fold = 0.33;
 my $dp_max_fold = 3;
 my $mad_min_fold = 0.11;
 my $min_GQ = 0;
 my $remove_fail = 0;
 
-my $vcf_header_append = "##flt $0 @ARGV";
+my $vcf_header_append = "##flt=$0 @ARGV";
 
 GetOptions (
     'help|h!' => \$opt_help,
@@ -64,8 +66,10 @@ GetOptions (
     'miss_threshold=s' => \$miss_threshold,
     'o|outvcf=s' => \$out_file,
     'dp_min_fold=s' => \$dp_min_fold,
+    'dp_min_abs=i' => \$dp_min_abs,
     'dp_max_fold=s' => \$dp_max_fold,
     'mad_min_fold=s' => \$mad_min_fold,
+    'mad_min_abs=i' => \$mad_min_abs,
     'min_GQ=i' => \$min_GQ,
     'remove_fail!' => \$remove_fail,
 );
@@ -79,9 +83,11 @@ Options:
     -o | --outvcf	    output file, default: -
     -p | --threads  	thread number, default: auto
     -G|depth_file	    Mean depth for each sample
-    --dp_min_fold		Hard-filter DP in each sample and each site, default: 0.33
-    --dp_max_fold		Hard-filter DP in each sample and each site, default: 3
-    --mad_min_fold		Hard-filter MAD (Minimum site allele depth) in each sample and each site, default: 0.11
+    --dp_min_fold		Hard-filter DP fold in each sample and each site, default: 0.33
+    --dp_max_fold		Hard-filter DP fold in each sample and each site, default: 3
+    --dp_min_abs        Hard-filter DP in each sample and each site, default: 3
+    --mad_min_fold		Hard-filter MAD (Minimum site allele depth) fold in each sample and each site, default: 0.11
+    --mad_min_abs       Hard-filter DP in each sample and each site, default: 1
     --miss_threshold	Filter site with more than X missing rates. Range from 0 to 1.	default: 1 (not filter)
     --min_GQ			Hard-filter GQ in each sample and each site, default: 0
     --remove_fail       Bool. Whether to remove fail variants. default: false.
@@ -104,7 +110,8 @@ foreach ($in_vcf, $depth_file) {
 }
 
 
-my %dp=&readdp($depth_file);
+my $dps=&readdp($depth_file);
+my $dps_minmax = &cal_min_max_dp($dps);
 #print STDERR "GC: ".join(' ',sort keys %dp)."\n";
 
 
@@ -117,7 +124,7 @@ while ( <$INVCF> ){
         next;
     }
     if (/^#/){
-        print $O join($vcf_header_append);
+        say $O $vcf_header_append;
         chomp;
         print STDERR $_."\n";
         if (/^#CHROM\s+POS\s+ID\s+REF\s+ALT\s+QUAL\s+FILTER\s+INFO\s+FORMAT\s+\w+/){
@@ -175,6 +182,32 @@ print STDERR `date`;
 exit 0;
 
 
+sub cal_min_max_dp {
+    my ($dps) = @_;
+    my %dps_minmax;
+    foreach my $id (sort keys %$dps) {
+        die "$id not found in Depth file" unless exists $dps->{$id};
+        my $dp = $dps->{$id};
+        # min_dp 去尾
+        my $min_dp = $dp * $dp_min_fold;
+        $min_dp = int($min_dp);
+        if($min_dp < $dp_min_abs) {
+            $min_dp = $dp_min_abs;
+        }
+        # min_mad 去尾
+        my $min_mad = $dp * $mad_min_fold;
+        $min_mad = int($min_mad); 
+        if($min_mad < $mad_min_abs) {
+            $min_mad = $mad_min_abs;
+        }
+        # max_dp 进一
+        my $max_dp = $dp * $dp_max_fold;
+        $max_dp = int($max_dp)+1 if $max_dp > int($max_dp); 
+        $max_dp = int($max_dp);
+        $dps_minmax{$id} = [$min_dp, $max_dp, $min_mad];
+    }
+    return(\%dps_minmax);
+}
 
 sub readdp {
     my ($in) = @_;
@@ -185,10 +218,11 @@ sub readdp {
         next unless $_;
         next if /^#/;
         my @a=split(/\s+/,$_);
+        next if $a[1] eq 'DP';
         $r{$a[0]}=$a[1];
     }
     close $D;
-    return %r;
+    return \%r;
 }
 
 
@@ -227,10 +261,12 @@ sub flt {
     my $miss=0;
     for (my $i=9;$i<@a;$i++){
         my $id=$idline[$i];
-        my $iddp_avg=$dp{$id} // die "dp not in list: $id";
-        my $mindp = $iddp_avg * $dp_min_fold;
-        my $maxdp = $iddp_avg * $dp_max_fold;
-        my $minMAD = $iddp_avg * $mad_min_fold;
+        #my $iddp_avg=$$dps{$id} // die "dp not in list: $id";
+        #my $mindp = $iddp_avg * $dp_min_fold;
+        #my $maxdp = $iddp_avg * $dp_max_fold;
+        #my $minMAD = $iddp_avg * $mad_min_fold;
+        die "dp not in list: $id" unless exists $dps_minmax->{$id};
+        my ($mindp, $maxdp, $minMAD) = @{$dps_minmax->{$id}};
         $minMAD = 1 if $minMAD < 1;
         if ($a[$i]=~m#^\.[|/]\.#){
             $miss++;

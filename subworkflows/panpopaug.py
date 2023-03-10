@@ -191,6 +191,23 @@ rule aug_realign1:
         """
 
 
+rule aug_split_svp_sv_realign1:
+    input:
+        vcf = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz',
+    output:
+        SNPs_vcf = '8.aug_realign/1.SV.split.{chrm}.snp.vcf.gz',
+        SVs_vcf = '8.aug_realign/1.SV.split.{chrm}.sv.vcf.gz', # Augment output SV VCF
+        INDELs_vcf = '8.aug_realign/1.SV.split.{chrm}.indel.vcf.gz',
+    params:
+        SV_min_length = config['SV_min_length'],
+        outprefix = "8.aug_realign/1.SV.split.{chrm}",
+    log:
+        'logs/8.1x.split_snp_sv.{chrm}.vcf.gz.log',
+    shell:
+        """
+	perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf}  {params.outprefix} {params.SV_min_length} > {log} 2>&1
+        """
+
 rule aug_realign2:
     input:
         vcf = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz',
@@ -214,51 +231,30 @@ rule aug_realign2:
         """
 
 
-rule aug_split_simple_complex:
+rule aug_split_svp_sv_realign2:
     input:
         vcf = '8.aug_realign/2.realign2.{chrm}.sorted.vcf.gz',
     output:
-        simpleVCF = '8.aug_realign/3.1.simple.{chrm}.vcf.gz',
-        complexVCF = '8.aug_realign/4.1.complex.{chrm}.vcf.gz',
+        SNPs_vcf = '8.aug_realign/2.SNP.split.{chrm}.snp.vcf.gz', # Augment output SNP/InDel VCF
+        SVs_vcf = '8.aug_realign/2.SNP.split.{chrm}.sv.vcf.gz',
+        INDELs_vcf = '8.aug_realign/2.SNP.split.{chrm}.indel.vcf.gz',
     params:
-        realign_extend_bp_max = config['realign_extend_bp_max'],
-        realign_extend_bp_min = config['realign_extend_bp_min'],
-        tmpdir = config['memory_tmp_dir'],
-        ssindel_maxlen = config['ssindel_maxlen'],
-        ssindel_maxallele = config['ssindel_maxallele'],
         SV_min_length = config['SV_min_length'],
+        outprefix = "8.aug_realign/2.SNP.split.{chrm}",
     log:
-        'logs/8.3.aug_split_simple_complex.{chrm}.vcf.gz.log',
+        'logs/8.2x.split_snp_sv.{chrm}.vcf.gz.log',
     shell:
         """
-	perl {workflow.basedir}/scripts/vcf_split_ssindel.pl --invcf {input.vcf} --outvcf_short {output.simpleVCF} --outvcf_long {output.complexVCF} --ssindel_maxlen {params.ssindel_maxlen} --ssindel_maxallele {params.ssindel_maxallele} --threads {threads} --SV_min_length {params.SV_min_length} > {log} 2>&1
+	perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf}  {params.outprefix} {params.SV_min_length} > {log} 2>&1
         """
-
-
-rule aug_filter_maf_simpleVCF:
-    input:
-        vcf = '8.aug_realign/3.1.simple.{chrm}.vcf.gz'
-    output:
-        vcf = '8.aug_realign/3.2.simple.filter_maf.{chrm}.vcf.gz'
-    log:
-        'logs/8.3.2.aug_filter_maf_simpleVCF.{chrm}.vcf.gz.log'
-    threads: config['cores_realign']
-    params:
-        min_maf = config['genotype_MAF'],
-        max_miss_freq = config['max_missing_rate'],
-    shell:
-        """
-        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} > {log} 2>&1
-        """
-
 
 rule aug_thin_complexVCF:
     input:
-        vcf = '8.aug_realign/4.1.complex.{chrm}.vcf.gz'
+        vcf = '8.aug_realign/2.realign2.{chrm}.sorted.vcf.gz'
     output:
-        vcf = '8.aug_realign/4.2.complex.thin.{chrm}.vcf.gz'
+        vcf = '8.aug_realign/3.thin1.{chrm}.vcf.gz'
     log:
-        'logs/8.4.2.aug_thin_complexVCF.{chrm}.vcf.gz.log'
+        'logs/8.3.aug_thin_complexVCF.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
@@ -268,13 +264,53 @@ rule aug_thin_complexVCF:
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} > {log} 2>&1
         """
 
+        
+rule aug_thin1_realign2:
+    input:
+        vcf = '8.aug_realign/3.thin1.{chrm}.vcf.gz',
+        ref_fasta_file = GRAPH + '.gfa.fa'
+    output:
+        vcf = '8.aug_realign/4.realign2.{chrm}.vcf.gz',
+        vcf_sorted = '8.aug_realign/4.realign2.{chrm}.sorted.vcf.gz',
+    log:
+        'logs/8.4.realign2.{chrm}.vcf.gz.log'
+    threads: config['cores_realign']
+    resources:
+        mem_mb=config['mem_realign']
+    params:
+        realign_extend_bp_max = config['realign_extend_bp_max'],
+        realign_extend_bp_min = config['realign_extend_bp_min'],
+        tmpdir = config['memory_tmp_dir']
+    shell:
+        """
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 2 > {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
+        """
+
+rule aug_thin2_complexVCF:
+    input:
+        vcf = '8.aug_realign/4.realign2.{chrm}.sorted.vcf.gz'
+    output:
+        vcf = '8.aug_realign/5.thin2.{chrm}.vcf.gz'
+    log:
+        'logs/8.5.aug_thin2_complexVCF.{chrm}.vcf.gz.log'
+    threads: config['cores_realign']
+    params:
+        sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
+        tmpdir = config['memory_tmp_dir'],
+    shell:
+        """
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} > {log} 2>&1
+        """
+
+
 rule aug_filter_maf2:
     input:
-        vcf = '8.aug_realign/4.2.complex.thin.{chrm}.vcf.gz'
+        vcf = '8.aug_realign/5.thin2.{chrm}.vcf.gz'
     output:
-        vcf = '8.aug_realign/4.3.filter_maf1.{chrm}.vcf.gz'
+        vcf = '8.aug_realign/6.filter_maf1.{chrm}.vcf.gz'
     log:
-        'logs/8.4.3.filter_maf1.{chrm}.vcf.gz.log'
+        'logs/8.6.filter_maf1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
         min_maf = config['genotype_MAF'],
@@ -285,21 +321,23 @@ rule aug_filter_maf2:
         """
 
 
-rule aug_filter_maf3:
+rule aug_split_vcf_by_type_splitchr:
     input:
-        vcf = '8.aug_realign/3.2.simple.filter_maf.{chrm}.vcf.gz'
+        vcf = '8.aug_realign/6.filter_maf1.{chrm}.vcf.gz'
     output:
-        vcf = '8.aug_realign/3.3.filter_maf1.{chrm}.vcf.gz'
+        vcf_snp = '8.aug_realign/7.PAV.{chrm}.snp.vcf.gz',
+        vcf_indel = '8.aug_realign/7.PAV.{chrm}.indel.vcf.gz',
+        vcf_sv = '8.aug_realign/7.PAV.{chrm}.sv.vcf.gz',
     log:
-        'logs/8.3.3.filter_maf1.{chrm}.vcf.gz.log'
-    threads: config['cores_realign']
+        'logs/8.7.{chrm}.split_vcf.log'
     params:
-        min_maf = config['genotype_MAF'],
-        max_miss_freq = config['max_missing_rate']
+        outprefix = '8.aug_realign/7.PAV.{chrm}',
+        min_sv_len = config['SV_min_length']
     shell:
         """
-        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} > {log} 2>&1
+        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
         """
+
 
 # Finally
 rule aug_merge_vcf_nosplitchrs:
@@ -329,42 +367,17 @@ rule aug_merge_vcf_splitchrs:
         {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} > {log} 2>&1
         """
 
-
-########################################### old
-###########################################
-rule aug_split_vcf_by_type:
+rule aug_merge_vcf_splitchrs2:
     input:
-        vcf = '8.aug_realign/4.filter_maf1.{chrm}.vcf.gz'
+        vcfs = expand('8.aug_realign/{{prefix}}.{chrm}.{{prefix1}}.vcf.gz', chrm=CHRS),
     output:
-        vcf_all = '9.aug_final_result/1.final.{chrm}.all.vcf.gz',
-        vcf_snp = '9.aug_final_result/2.final.{chrm}.snp.vcf.gz',
-        vcf_indel = '9.aug_final_result/2.final.{chrm}.indel.vcf.gz',
-        vcf_sv = '9.aug_final_result/2.final.{chrm}.sv.vcf.gz'
+        vcf = '9.aug_final_result/{prefix}.final_mergechr.all.{prefix1}.vcf.gz'
+    threads:
+        6
     log:
-        'logs/9.split_vcf.{chrm}.log'
-    params:
-        outprefix = '9.aug_final_result/2.final.{chrm}',
-        min_sv_len = config['SV_min_length']
+        'logs/9.{prefix}.{prefix1}.log'
     shell:
         """
-        cp {input.vcf} {output.vcf_all}
-        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
+        {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} > {log} 2>&1
         """
 
-
-rule aug_split_vcf_by_type_splitchr:
-    input:
-        vcf = '9.aug_final_result/1.final_mergechr.all.vcf.gz'
-    output:
-        vcf_snp = '9.aug_final_result/2.final_mergechr.snp.vcf.gz',
-        vcf_indel = '9.aug_final_result/2.final_mergechr.indel.vcf.gz',
-        vcf_sv = '9.aug_final_result/2.final_mergechr.sv.vcf.gz'
-    log:
-        'logs/9.2.split_vcf.log'
-    params:
-        outprefix = '9.aug_final_result/2.final_mergechr',
-        min_sv_len = config['SV_min_length']
-    shell:
-        """
-        perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} > {log} 2>&1
-        """

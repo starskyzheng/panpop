@@ -33,12 +33,12 @@ if config['split_chr']==True:
     elif config['mode'] == 'augment':
         rule all:
             input:
-                expand('8.aug_realign/4.3.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
-                expand('8.aug_realign/3.3.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
-                #'9.aug_final_result/1.final_mergechr.all.vcf.gz',
-                #'9.aug_final_result/2.final_mergechr.sv.vcf.gz',
-                '9.aug_final_result/3.3.filter_maf1.final_mergechr.all.vcf.gz',
-                '9.aug_final_result/4.3.filter_maf1.final_mergechr.all.vcf.gz',
+                expand('8.aug_realign/6.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+                '9.aug_final_result/1.SV.split.final_mergechr.all.sv.vcf.gz', # Augment output SV VCF
+                '9.aug_final_result/2.SNP.split.final_mergechr.all.snp.vcf.gz', # Augment output SNP VCF
+                '9.aug_final_result/2.SNP.split.final_mergechr.all.indel.vcf.gz', # Augment output InDel VCF
+                '9.aug_final_result/7.PAV.final_mergechr.all.sv.vcf.gz', # Augment output PAV VCF
+                
 elif config['split_chr']==False:
     CHRS=['all']
     if config['mode'] == 'genotype':
@@ -50,8 +50,9 @@ elif config['split_chr']==False:
     elif config['mode'] == 'augment':
         rule all:
             input:
-                '9.aug_final_result/1.final.all.all.vcf.gz',
-                '9.aug_final_result/2.final.all.sv.vcf.gz'
+                '9.aug_final_result/1.x.split.all.sv.vcf.gz', # Augment output SV VCF
+                '9.aug_final_result/2.SNP.split.all.snp.vcf.gz', # Augment output SV VCF
+                '9.aug_final_result/7.PAV.all.sv.vcf.gz', # Augment output PAV VCF
 
 include: "subworkflows/panpopbase.py"
 include: "subworkflows/panpopaug.py"

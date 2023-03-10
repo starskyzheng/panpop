@@ -29,6 +29,8 @@ EOF
 
 my ($in_vcf, $out_vcf, $threads, $force_recode);# = @ARGV;
 
+my $header_append_info = "##merge_vcf_samepos=perl $0 @ARGV";
+
 GetOptions (
     'i|invcf=s' => \$in_vcf,
     'o|outvcf=s' => \$out_vcf,
@@ -59,7 +61,7 @@ while(<$I>) {
             next;
         }
         @vcf_header = split(/\t/);
-        say $O "##merge_vcf_samepos=perl $0 @ARGV";
+        say $O $header_append_info;
         say $O $_;
         last;
     }
