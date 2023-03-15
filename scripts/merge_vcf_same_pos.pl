@@ -185,7 +185,7 @@ sub print_lens {
             if ( defined $dpsource and $dpsource eq 'append' ) {
                 $mad //= $dp;
             }
-            if($ignore_dp==1) {
+            if(defined $ignore_dp) {
                 $dp = 9;
             }
             if ($a1 eq '.' or $a2 eq '.' or 
