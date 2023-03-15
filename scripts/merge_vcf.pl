@@ -87,7 +87,8 @@ GetOptions (
 &help() unless($inlist && $out && $tmp_dir_top);
 
 my $bcftools_appends="--threads $bcftools_threads";
-$bcftools_appends .= " -m none --non_normalize_alleles" if $m_none==1;
+#$bcftools_appends .= " -m none --non_normalize_alleles" if $m_none==1;
+$bcftools_appends .= " -m none" if $m_none==1;
 $bcftools_appends .= " --regions $chrome" if defined $chrome;
 
 my $config = read_config_yaml("$Bin/../config.yaml");

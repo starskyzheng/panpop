@@ -250,30 +250,35 @@ rule aug_split_svp_sv_realign2:
 
 rule aug_thin_complexVCF:
     input:
-        vcf = '8.aug_realign/2.realign2.{chrm}.sorted.vcf.gz'
+        vcf = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz'
     output:
-        vcf = '8.aug_realign/3.thin1.{chrm}.vcf.gz'
+        vcf1 = '8.aug_realign/3.thin1.{chrm}.vcf.gz',
+        vcf2 = '8.aug_realign/3.thin2.{chrm}.vcf.gz',
+        vcf2_sorted = '8.aug_realign/3.thin2.{chrm}.sorted.vcf.gz'
     log:
         'logs/8.3.aug_thin_complexVCF.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
         tmpdir = config['memory_tmp_dir'],
+        max_len_tomerge = 5,
+        sv_min_dp = config['SV_min_length'],
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} > {log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf1} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} > {log} 2>&1
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --threads {threads} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge}
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf2_sorted} -O z {output.vcf2} > {log} 2>&1
         """
 
-        
 rule aug_thin1_realign2:
     input:
-        vcf = '8.aug_realign/3.thin1.{chrm}.vcf.gz',
+        vcf = '8.aug_realign/3.thin2.{chrm}.sorted.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '8.aug_realign/4.realign2.{chrm}.vcf.gz',
-        vcf_sorted = '8.aug_realign/4.realign2.{chrm}.sorted.vcf.gz',
+        vcf = '8.aug_realign/4.realign1.{chrm}.vcf.gz',
+        vcf_sorted = '8.aug_realign/4.realign1.{chrm}.sorted.vcf.gz',
     log:
-        'logs/8.4.realign2.{chrm}.vcf.gz.log'
+        'logs/8.4.realign1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
@@ -283,30 +288,36 @@ rule aug_thin1_realign2:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 2 > {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 1 > {log} 2>&1
         {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} > {log} 2>&1
         """
 
 rule aug_thin2_complexVCF:
     input:
-        vcf = '8.aug_realign/4.realign2.{chrm}.sorted.vcf.gz'
+        vcf = '8.aug_realign/4.realign1.{chrm}.sorted.vcf.gz'
     output:
-        vcf = '8.aug_realign/5.thin2.{chrm}.vcf.gz'
+        vcf1 = '8.aug_realign/5.thin1.{chrm}.vcf.gz',
+        vcf2 = '8.aug_realign/5.thin2.{chrm}.vcf.gz',
+        vcf2_sorted = '8.aug_realign/5.thin2.{chrm}.sorted.vcf.gz'
     log:
         'logs/8.5.aug_thin2_complexVCF.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
         tmpdir = config['memory_tmp_dir'],
+        max_len_tomerge = 5,
+        sv_min_dp = config['SV_min_length'],
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} > {log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf1} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} > {log} 2>&1
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --threads {threads} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge}
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf2_sorted} -O z {output.vcf2} > {log} 2>&1
         """
 
 
 rule aug_filter_maf2:
     input:
-        vcf = '8.aug_realign/5.thin2.{chrm}.vcf.gz'
+        vcf = '8.aug_realign/5.thin2.{chrm}.sorted.vcf.gz'
     output:
         vcf = '8.aug_realign/6.filter_maf1.{chrm}.vcf.gz'
     log:

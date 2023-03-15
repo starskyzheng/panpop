@@ -70,7 +70,7 @@ our $tmp_dir = $tmp_dir_def;
 my $threads = 32;
 our $verb = 0;
 our $debug = 0;
-my $max_refalts_threshold = 9999; # too big may slow down speed
+my $max_refalts_threshold = 10; # too big may slow down speed
 
 GetOptions (
         'help|h!' => \$opt_help,

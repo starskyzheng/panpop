@@ -27,7 +27,7 @@ Options:
 EOF
 }
 
-my ($in_vcf, $out_vcf, $threads, $force_recode);# = @ARGV;
+my ($in_vcf, $out_vcf, $threads, $force_recode, $ignore_dp);# = @ARGV;
 
 my $header_append_info = "##merge_vcf_samepos=perl $0 @ARGV";
 
@@ -37,6 +37,7 @@ GetOptions (
     'p|threads=i' => \$threads,
     'F|force_recode' => \$force_recode,
     'h|help' => sub { help(); exit(0); },
+    'ignore_dp!' => \$ignore_dp,
 );
 
 &help() unless $in_vcf and -e $in_vcf and $out_vcf;
@@ -166,7 +167,7 @@ sub print_lens {
                 next;
             }
         }
-        die unless defined $DP_num;# and defined $GQ_num and defined $MAD_num;
+        # die unless defined $DP_num;# and defined $GQ_num and defined $MAD_num;
         my $ref_len = length($ref);
         $infos{$ref_len} = [ $line[0], $line[1] ];
         $refs{$ref_len} //= $ref;
@@ -177,12 +178,15 @@ sub print_lens {
             my @F = split(/:/, $line[$idi]);
             $F[0]=~m#^([.\d]+)[/|]([.\d]+)$# or die $F[0];
             my ($a1, $a2) = ($1, $2);
-            my $dp = $F[$DP_num];
+            my $dp = defined $DP_num ? $F[$DP_num] : '.';
             my $dpsource = defined $DPSOURCE_num ? $F[$DPSOURCE_num] : undef;
             my $gq = defined $GQ_num ? $F[$GQ_num] : '.';
             my $mad = defined $MAD_num ? $F[$MAD_num] : '.';
             if ( defined $dpsource and $dpsource eq 'append' ) {
                 $mad //= $dp;
+            }
+            if($ignore_dp==1) {
+                $dp = 9;
             }
             if ($a1 eq '.' or $a2 eq '.' or 
                     $dp eq '.' or 
