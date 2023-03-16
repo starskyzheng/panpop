@@ -48,16 +48,14 @@ my ($infile, $outfile, $opt_help, $ref_fasta_file);
 our $tmp_dir_def = '/run/user/' . `id -u`; chomp $tmp_dir_def;
 our $debug = 0;
 our $verb = 0;
-our $align_level = 2;
+our $align_level = 1;
 my $is_aug = 0;
 my $ext_bp_max = 10;
 my $ext_bp_min = 1;
 my $print_all = 0;
-my $skip_mut_at_same_pos;
+my $skip_mut_at_same_pos = 2;
 our $threads = 1; # default threads
 our $tmp_dir = $tmp_dir_def;
-
-#my @SKIPCHR = qw/1 2 3 5 6/;
 
 sub usage {
     my $msg = shift;
@@ -76,11 +74,11 @@ options:
     --verb <bool>
     --all <bool>                   Print lines even no mutation.
     --level <1|2>                  Level 1 only split muts by non-mut non-missing blocks
-    --skip_mut_at_same_pos
 EOF
     exit(1);
 }
 
+my $ARGVs = join(" ", $0, @ARGV);
 
 GetOptions (
         'h|help!' => \$opt_help,
@@ -96,7 +94,7 @@ GetOptions (
         'e|ext_bp_min=i' => \$ext_bp_min,
         'all!' => \$print_all,
         'level=i' => \$align_level,
-        'skip_mut_at_same_pos!' => \$skip_mut_at_same_pos,
+        'skip_mut_at_same_pos=i' => \$skip_mut_at_same_pos,
 );
 
 
@@ -125,10 +123,11 @@ if ($is_aug==0) {
 }
 say STDERR "Done reading ref fasta $REF_SEQS_STAT";
 
-my $VCF_APPEND = <<'EOF';
+my $VCF_APPEND = <<"EOF";
 ##INFO=<ID=ZORIPOS,Number=1,Type=Integer,Description="original start position before Realign of Variant">
 ##INFO=<ID=ZORIEND,Number=1,Type=Integer,Description="original end position before Realign of Variant">
 ##INFO=<ID=ZLEN,Number=1,Type=Integer,Description="original length before Realign of Variant">
+##CommandLine="$ARGVs"
 EOF
 
 my $vcf_header = &read_vcf_header($I_VCF, $O_VCF, $VCF_APPEND);
@@ -263,7 +262,6 @@ sub zz_mce_producer {
             next;
         }
         # next if $pos < 14999102; ######### debug
-        #next if exists $SKIPCHR{$F[0]};
         unless (defined $chr_old) { # init
             $chr_old = $chr;
             $min_start = $pos;
@@ -455,6 +453,7 @@ sub rebuild_cons_seqs {
         my $alt_svs=0;
         ILINE:for(my $iline=$iline_max; $iline>=0; $iline--) { # from last to first
             my $line = $$lines[$iline];
+            my $alts = $$line[4];
             my $sv_start = $$line[1];
             die if $last_start < $sv_start;
             $last_start = $sv_start;
@@ -477,15 +476,27 @@ sub rebuild_cons_seqs {
             }
             ## alt
             $alt_svs++;
-            for(my $p=$sv_start; $p<=$sv_end; $p++) {
+            CHECKPOS:for(my $p=$sv_start; $p<=$sv_end; $p++) {
                 if (exists $sites_status{$p} and $sites_status{$p} == 1) {
                     my $id_now = $$vcf_header[$idi];
-                    say STDERR "Mutation overlaped! chr:$chr, wins:$win_start, wine:$win_end pos:$p id:$id_now";
-                    if(defined $skip_mut_at_same_pos) {
+                    say STDERR "Warn: Mutation overlaped! chr:$chr, wins:$win_start, wine:$win_end pos:$p id:$id_now";
+                    if($skip_mut_at_same_pos == 1) {
+                        # 只要有一个位点有问题，就跳过这个个体的这一行
                         next ILINE;
-                    } else {
-                        say STDERR "$ref ;\n$a1 ; \n$a2";
-                        die "DIE! chr:$chr, wins:$win_start, wine:$win_end, pos:$p, idi:$idi, line:$iline, alles:$$alles[0], $$alles[1]";
+                    } elsif($skip_mut_at_same_pos == 2) {
+                        # 跳过冲突的位点 (自动修复)
+                        my $ref_len_max = $p-$sv_start;
+                        # deep copy
+                        my $alts_ = [@$alts];
+                        $$alts_[ $$alles[0]-1 ] = substr($$alts_[ $$alles[0]-1 ], 0, $ref_len_max);
+                        $ref_len = $ref_len_max;
+                        $alts = $alts_;
+                        #die $$alts[ $$alles[0]-1 ];
+                        last CHECKPOS;
+                    } else { # skip_mut_at_same_pos == 0
+                        # 有冲突位点就报错退出!
+                        say STDERR "$ref ;\n$a1 ; \n$a2 $id_now";
+                        die "DIE! chr:$chr, wins:$win_start, wine:$win_end, pos:$p, idi:$idi, sv_start:$sv_start, sv_end:$sv_end line:$iline, ref_len:$ref_len, alles:$$alles[0], $$alles[1]";
                     }
                     
                 } else {
@@ -493,12 +504,12 @@ sub rebuild_cons_seqs {
                 }
             }
             if ($$alles[0] != 0) {
-                my $alt = $$line[4][ $$alles[0]-1 ];
+                my $alt = $$alts[ $$alles[0]-1 ];
                 say STDERR "$a1, $chr : $sv_start, $win_start~$win_end, $ref_len, $alt" if $debug;
                 substr($a1, $sv_start-$win_start, $ref_len, $alt);
             }
             if ($$alles[1] != 0) {
-                my $alt = $$line[4][ $$alles[1]-1 ];
+                my $alt = $$alts[ $$alles[1]-1 ];
                 substr($a2, $sv_start-$win_start, $ref_len, $alt);
             }
         }
