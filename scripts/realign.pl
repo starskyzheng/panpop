@@ -53,6 +53,7 @@ my $is_aug = 0;
 my $ext_bp_max = 10;
 my $ext_bp_min = 1;
 my $print_all = 0;
+my $skip_mut_at_same_pos;
 our $threads = 1; # default threads
 our $tmp_dir = $tmp_dir_def;
 
@@ -75,6 +76,7 @@ options:
     --verb <bool>
     --all <bool>                   Print lines even no mutation.
     --level <1|2>                  Level 1 only split muts by non-mut non-missing blocks
+    --skip_mut_at_same_pos
 EOF
     exit(1);
 }
@@ -94,6 +96,7 @@ GetOptions (
         'e|ext_bp_min=i' => \$ext_bp_min,
         'all!' => \$print_all,
         'level=i' => \$align_level,
+        'skip_mut_at_same_pos!' => \$skip_mut_at_same_pos,
 );
 
 
@@ -450,7 +453,7 @@ sub rebuild_cons_seqs {
         my $a2 = $ref;
         my $last_start = 99999999999999;
         my $alt_svs=0;
-        for(my $iline=$iline_max; $iline>=0; $iline--) { # from last to first
+        ILINE:for(my $iline=$iline_max; $iline>=0; $iline--) { # from last to first
             my $line = $$lines[$iline];
             my $sv_start = $$line[1];
             die if $last_start < $sv_start;
@@ -476,8 +479,15 @@ sub rebuild_cons_seqs {
             $alt_svs++;
             for(my $p=$sv_start; $p<=$sv_end; $p++) {
                 if (exists $sites_status{$p} and $sites_status{$p} == 1) {
-                    say STDERR "!!!! $ref ;\n$a1 ; \n$a2";
-                    die "DIE! chr:$chr, wins:$win_start, wine:$win_end, pos:$p, idi:$idi, line:$iline, alles:$$alles[0], $$alles[1]";
+                    my $id_now = $$vcf_header[$idi];
+                    say STDERR "Mutation overlaped! chr:$chr, wins:$win_start, wine:$win_end pos:$p id:$id_now";
+                    if(defined $skip_mut_at_same_pos) {
+                        next ILINE;
+                    } else {
+                        say STDERR "$ref ;\n$a1 ; \n$a2";
+                        die "DIE! chr:$chr, wins:$win_start, wine:$win_end, pos:$p, idi:$idi, line:$iline, alles:$$alles[0], $$alles[1]";
+                    }
+                    
                 } else {
                     $sites_status{$p}=1;
                 }

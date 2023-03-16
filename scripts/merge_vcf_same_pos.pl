@@ -24,11 +24,14 @@ Options:
     -o | --outvcf <file>         Output file, default: -
     -p | --threads <int>         Thread number, default: auto
     -F | --force_recode	<bool>   Force recode for each line, default: False
+    --ref <file>                 Reference fasta file
+    --skip_mut_at_same_pos
+    --ignore_dp
 EOF
 }
 
-my ($in_vcf, $out_vcf, $threads, $force_recode, $ignore_dp);# = @ARGV;
-
+my ($in_vcf, $out_vcf, $threads, $force_recode, $ignore_dp, $ref_fasta_file);# = @ARGV;
+my ($skip_mut_at_same_pos);
 my $header_append_info = "##merge_vcf_samepos=perl $0 @ARGV";
 
 GetOptions (
@@ -38,10 +41,16 @@ GetOptions (
     'F|force_recode' => \$force_recode,
     'h|help' => sub { help(); exit(0); },
     'ignore_dp!' => \$ignore_dp,
+    'ref=s' => \$ref_fasta_file,
+    'skip_mut_at_same_pos!' => \$skip_mut_at_same_pos,
 );
 
 &help() unless $in_vcf and -e $in_vcf and $out_vcf;
 
+my $ref_fasta;
+if (defined $ref_fasta_file) {
+    $ref_fasta = read_fasta($ref_fasta_file);
+}
 
 $threads //= 1;
 $force_recode //= 0;
@@ -52,22 +61,8 @@ my $OM = open_out_fh("$out_vcf.allmising", 8);
 say $OM join("\t", qw/#chr pos ref_len/);
 #my $infos = 'GT:DP';
 
-my @vcf_header;
-while(<$I>) {
-    chomp;
-    next unless $_;
-    if (/^#/) {
-        if (/^##/) {
-            say $O $_; ###########
-            next;
-        }
-        @vcf_header = split(/\t/);
-        say $O $header_append_info;
-        say $O $_;
-        last;
-    }
-    die;
-}
+my @vcf_header = &process_vcf_header($I, $O, $header_append_info);
+
 
 my $idi_max = scalar(@vcf_header)-1;
 my $id_count = $idi_max - 8;
@@ -91,6 +86,31 @@ MCE::Flow->finish;
 
 exit;
 
+sub process_vcf_header {
+    my ($I, $O, $header_append_info) = @_;
+    my $has_mad = 0;
+    while(<$I>) {
+        chomp;
+        next unless $_;
+        if (/^#/) {
+            if (/^##/) {
+                say $O $_; ###########
+                $has_mad++ if /ID=MAD,/;
+                next;
+            }
+            my @vcf_header = split(/\t/);
+            if($has_mad==0) {
+                my $mad = "##FORMAT=<ID=MAD,Number=1,Type=Integer,Description=\"Minimum site allele depth\">";
+                say $O $mad;
+            }
+            say $O $header_append_info;
+            say $O $_;
+            return @vcf_header;
+            last;
+        }
+        die;
+    }
+}
 
 sub consumer {
    # receive items
@@ -145,8 +165,8 @@ sub print_lens {
         return $$lines[0] . "\n";
     }
     my %id2types;
-    LINE:foreach my $line (@$lines) {
-        my @line = split(/\t/, $line);
+    LINE:foreach my $line_ (@$lines) {
+        my @line = split(/\t/, $line_);
         my $ref = $line[3];
         die unless defined $ref and $ref;
         #die unless $line[8]=~/^$infos/;
@@ -170,10 +190,23 @@ sub print_lens {
         # die unless defined $DP_num;# and defined $GQ_num and defined $MAD_num;
         my $ref_len = length($ref);
         $infos{$ref_len} = [ $line[0], $line[1] ];
+        if (defined $ref_fasta_file) {
+            my $chr = $line[0];
+            my $pos = $line[1];
+            my $refseq = $$ref_fasta{$chr} // die ;
+            my $ref_real = substr($refseq, $pos-1, $ref_len);
+            if($ref_real ne $ref) {
+                say STDERR "Fixing $chr $pos $ref_len: $ref_real ne $ref";
+                $ref = $ref_real;
+            }
+        }
         $refs{$ref_len} //= $ref;
-        die if $refs{$ref_len} ne $ref;
+        if ($refs{$ref_len} ne $ref) {
+            die "VCF ref error! Please provide a reference fasta file with --ref option.  \n 
+                 $ref_len ne $ref $line_.";
+        }
         my @ref_alts = ($ref, split(/,/, $line[4]));
-        for(my $idi=9; $idi<=$idi_max; $idi++) {
+        ID:for(my $idi=9; $idi<=$idi_max; $idi++) {
             #say STDERR "$idi $vcf_header[$idi] " ;
             my @F = split(/:/, $line[$idi]);
             $F[0]=~m#^([.\d]+)[/|]([.\d]+)$# or die $F[0];
@@ -210,11 +243,15 @@ sub print_lens {
                 $mut_now = 1;
             }
             if ( $mut_now==1 and $mut_old==1) {
+                if($skip_mut_at_same_pos) {
+                    next ID;
+                }
                 # ERROR! same pos with two mut
                 my $old_seq1 = $id2seqs{$ref_len}{$idi}[1];
                 my $old_seq2 = $id2seqs{$ref_len}{$idi}[2];
-                carp " exists! {$ref_len}{$idi} @{$id2seqs{$ref_len}{$idi}} $vcf_header[$idi]
-                    !!! line !!! :  @$line ";
+                carp "Error!!! Multiple mut at same pos exists! $ref_len $idi " . "\n" .
+                Dumper($id2seqs{$ref_len}{$idi}) . "\n" .
+                Dumper $vcf_header[$idi]  . " !!! line !!! :  @line";
             } elsif ($mut_now == -1 and $mut_old != -1) {
                 # missing now but not missing before
                 next;
@@ -295,3 +332,20 @@ sub print_lens {
     return '';
 }
 
+sub read_fasta {
+    my ($file) = @_;
+    my %seqs;
+    my $id;
+    open my $I, '<', $file or die "Cannot open $file: $!";
+    while(<$I>) {
+        chomp;
+        if (/^>(\S+)/) {
+            $id = $1;
+            $seqs{$id} = '';
+        } else {
+            $seqs{$id} .= $_;
+        }
+    }
+    close $I;
+    return \%seqs;
+}
