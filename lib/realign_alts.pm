@@ -88,8 +88,8 @@ sub init {
     }
 
     $ALN_PARAMS_max_tryi = $main::config->{realign_max_try_times_per_method};
-    $ALN_PARAMS{famsa} = "$famsa -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
-    $ALN_PARAMS{famsaP} = "$famsa -t 32 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
+    $ALN_PARAMS{famsa} = "$famsa -t 1 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
+    $ALN_PARAMS{famsaP} = "$famsa -t 8 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
     $ALN_PARAMS{HAlignC} = "C";
     $ALN_PARAMS{mafft} = "$mafft --auto --thread 4 - 2>/dev/null" if $mafft;
     $ALN_PARAMS{muscle} = "$muscle3 -maxiters 16 -diags 2>/dev/null" if $muscle3;
@@ -115,10 +115,10 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
         $$lefti{muscle}--;
         return('muscle', $tried);
-    } elsif ( $$lefti{famsa}>0 ) {
-        my $tried = $ALN_PARAMS_max_tryi-$$lefti{famsa}+1;
-        $$lefti{famsa}--;
-        return('famsa', $tried);
+    } elsif ( $$lefti{famsaP}>0 ) {
+        my $tried = $ALN_PARAMS_max_tryi-$$lefti{famsaP}+1;
+        $$lefti{famsaP}--;
+        return('famsaP', $tried);
     } elsif ( $$lefti{HAlignC}>0 ) { ##########
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;

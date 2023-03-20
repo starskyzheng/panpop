@@ -73,7 +73,7 @@ options:
     -h | --help                    Print this help
     --verb <bool>
     --all <bool>                   Print lines even no mutation.
-    --level <1|2>                  Level 1 only split muts by non-mut non-missing blocks
+    --level <1|2>                  Level 1 only split muts by non-mut non-missing blocks. Level 2 will not merge lines
 EOF
     exit(1);
 }
