@@ -73,7 +73,7 @@ options:
     -h | --help                    Print this help
     --verb <bool>
     --all <bool>                   Print lines even no mutation.
-    --level <1|2>                  Level 1 only split muts by non-mut non-missing blocks. Level 2 will not merge lines
+    --level <BITCODE>              Level &2 will not merge lines. Level &4 will split missing alles.
 EOF
     exit(1);
 }
@@ -255,7 +255,7 @@ sub zz_mce_producer {
         my $ref_seq = $F[3];
         my @alts = split(/,/, $F[4]);
         $F[4] = \@alts;
-        if ($align_level==2) { # align_level==2, not merge lines
+        if ($align_level & 2) { # align_level==2, not merge lines
             $end_real = $pos + length($ref_seq) - 1;
             $queue->enqueue( $iline, [[\@F], $chr, $pos, $end_real]);
             $iline++;
@@ -643,12 +643,13 @@ sub read_ref_noaug {
             my $chr_raw = $1;
             if ($chr_raw=~/^\d+$/) {
                 $seq_now = \$ref{$chr_raw};
-            } else {
-                $chr_raw=~/^([\w_]+)\[(\d+)\]$/ or die; # zzperl vg2gfa2fa
+            } elsif ($chr_raw=~/^([\w_]+)\[(\d+)\]$/) {  # zzperl vg2gfa2fa
                 #$chr_raw=~/^(\S+)_(\d+)_\d+(\s|$)/ or die; # gfatools gfa2fa
                 my $chr = $1;
                 my $pos = $2;
                 $seq_now = \$nonref{$chr}{$pos};
+            } else {
+                die "Error: Chr name error, must be numeric only: $in : $chr_raw"
             }
             $$seq_now = '';
             next;

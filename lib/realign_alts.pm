@@ -88,7 +88,7 @@ sub init {
     }
 
     $ALN_PARAMS_max_tryi = $main::config->{realign_max_try_times_per_method};
-    $ALN_PARAMS{famsa} = "$famsa -t 1 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
+    #$ALN_PARAMS{famsa} = "$famsa -t 1 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
     $ALN_PARAMS{famsaP} = "$famsa -t 8 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
     $ALN_PARAMS{HAlignC} = "C";
     $ALN_PARAMS{mafft} = "$mafft --auto --thread 4 - 2>/dev/null" if $mafft;
@@ -224,7 +224,11 @@ sub process_alts {
     } else {
         ($aln_exit_status, $aln_alts) = &aln_pipeline($selsoft, $alts, $max_alts);
     }
-    unless (exists $$aln_alts[0]) {
+    if( $aln_exit_status!=0 ) {
+        carp "Warn! aln software($selsoft) exit status($aln_exit_status)! redo! No. $tryi";
+        goto REDO_process_alts;
+    }
+    unless (defined $aln_alts and exists $$aln_alts[0]) {
         carp "Warn! no alt[0] from aln software($selsoft)! redo! No. $tryi";
         goto REDO_process_alts;
     }
@@ -264,7 +268,7 @@ sub alt_alts_to_muts {
             $ref_missn++ if $is_ref_miss_now;
             if ($is_miss==1) {
                 # continue missing
-                if ($align_level==2) {
+                if ($align_level & 4) {
                     my $diff_is_same = &cal_sarray_is_compatible($old_sarray, $sarray);
                     if ( $diff_is_same==0 and length($$old_sarray[0])>0 and 
                             $is_ref_miss_now==0 ) {
@@ -682,6 +686,14 @@ sub read_fa_fh {
         $seqs{$ialt} = '-' x $len;
     }
     my @seqids = sort {$a<=>$b} keys %seqs;
+    # check len must same
+    foreach my $seqid (@seqids) {
+        my $len_now = length($seqs{$seqid});
+        if( $len_now != $len ) {
+            #die "seqid $seqid len $len not same as 0 len $len";
+            return undef;
+        }
+    }
     return( [ @seqs{@seqids} ] );
 }
 

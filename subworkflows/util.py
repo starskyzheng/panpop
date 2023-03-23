@@ -1,5 +1,6 @@
 import re
 import os
+import sys
 
 def cal_fa_len(fa_file):
     """
@@ -25,7 +26,18 @@ def fa2chrs(fa_file):
         for line in f:
             if line.startswith('>'):
                 chr = re.search('>(\S+)', line).group(1)
-                chrs.append(chr)                
+                # chr must be numberic only
+                try:
+                    int(chr)
+                except:
+                    print('Error: chr is not numeric in {}: {}'.format(fa_file, chr), file=sys.stderr)
+                    # die
+                    sys.exit(1)
+                chrs.append(chr)
+    if len(chrs) == 0:
+        print('Error: No chr found in {}! which might be no `P line` in gfa file'.format(fa_file), file=sys.stderr)
+        # die
+        sys.exit(1)
     return chrs
     
 def gfa2chrs(gfa_file):
@@ -37,7 +49,18 @@ def gfa2chrs(gfa_file):
         for line in f:
             if line.startswith('P'):
                 chr = re.search('^P\t(\S+)\t', line).group(1)
-                chrs.append(chr)                
+                # chr must be numberic only
+                try:
+                    int(chr)
+                except:
+                    print('Error: chr is not numeric in {}: {}'.format(gfa_file, chr), file=sys.stderr)
+                    # die
+                    sys.exit(1)
+                chrs.append(chr)   
+    if len(chrs) == 0:
+        print('Error: No chr found in {}! which might be no `P line` in gfa file'.format(gfa_file), file=sys.stderr)
+        # die
+        sys.exit(1)             
     return chrs
 
 def rgfa_read_chr(rgfa_file):

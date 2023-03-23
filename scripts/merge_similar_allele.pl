@@ -70,7 +70,7 @@ our $tmp_dir = $tmp_dir_def;
 my $threads = 32;
 our $verb = 0;
 our $debug = 0;
-my $max_refalts_threshold = 10; # too big may slow down speed
+my $max_refalts_threshold = 16; # too big may slow down speed
 
 GetOptions (
         'help|h!' => \$opt_help,
@@ -165,7 +165,7 @@ sub prase_line {
     my @ref_alts = ($ref, @alts);
     my $max_refaltsi = scalar(@ref_alts)-1;
     if ($force_cpx==0 and $max_refaltsi >= $max_refalts_threshold) {
-        say STDERR "Too much alleles at $F[0]:$F[1] ($max_refaltsi)! Keep this loc unchanged";
+        say STDERR "Too much alleles at $F[0]:$F[1] ($max_refaltsi)! push to lines_cpx" if $debug==1;
         return($line, 1);
     }
     #my $random = time() . "_" . rand();
