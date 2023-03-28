@@ -712,7 +712,15 @@ sub read_fa_fh {
         $seqs{$seqid_now} .= $_;
     }
     close $fh;
-    my $len = length($seqs{0});
+    my $i_not_empty = 0;
+    my $len;
+    while(!defined $len) {
+        next unless exists $seqs{$i_not_empty};
+        $len = length($seqs{$i_not_empty});
+        last;
+    }
+    die "??? all empty?" if !defined $len;
+    #my $len = length($seqs{0});
     foreach my $ialt (@$empty_ialts) {
         $seqs{$ialt} = '-' x $len;
     }
