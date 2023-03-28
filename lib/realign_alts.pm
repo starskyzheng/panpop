@@ -153,10 +153,15 @@ sub aln_halign {
     my $fastafh = File::Temp->new(DIR=>"$tmp_dir");
     my $fasta = $fastafh->filename;
     my $fastaaln = "$fasta.aln";
+    my @empty_ialt;
     foreach my $ialt(0..$max_alts) {
-        my $alt = $$alts[$ialt];
+        my $alt_seq = $$alts[$ialt];
+        if($alt_seq eq "" or $alt_seq =~/^[*-]+$/) {
+            push @empty_ialt, $ialt;
+            next;
+        }
         say $fastafh ">$ialt";
-        say $fastafh $alt;
+        say $fastafh $alt_seq;
     }
     close $fastafh;
     my $cmd;
@@ -173,7 +178,7 @@ sub aln_halign {
         return(-1, undef);
     }
     my $alnfh = open_in_fh($fastaaln);
-    my $aln_alts = &read_fa_fh($alnfh);
+    my $aln_alts = &read_fa_fh($alnfh, \@empty_ialt);
     unlink $fastaaln if $debug==0;
     return($aln_exit_status, $aln_alts);
 }
@@ -187,7 +192,7 @@ sub aln_pipeline {
     my @empty_ialt;
     foreach my $ialt(0..$max_alts) {
         my $alt_seq = $$alts[$ialt];
-        if($alt_seq eq "" or $alt_seq eq '-' or $alt_seq eq '*') {
+        if($alt_seq eq "" or $alt_seq =~/^[*-]+$/) {
             push @empty_ialt, $ialt;
             next;
         }
@@ -278,7 +283,7 @@ sub alt_alts_to_muts {
     my %muts;
     my $aln_seqlen = length( $$alts[0] );
     foreach my $ialt (0..$max_alts) {
-        my $seq = $$alts[$ialt] // die "$ialt not in alts: " . Dumper $alts;
+        my $seq = $$alts[$ialt] // confess "$ialt not in alts: " . Dumper $alts;
         my $l = length($seq);
         confess("length:  $l != $aln_seqlen") if $l != $aln_seqlen;
         tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
