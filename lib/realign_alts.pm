@@ -725,7 +725,7 @@ sub read_fa_fh {
         
         last;
     }
-    die "??? all empty?" if !defined $len;
+    return undef if !defined $len; # no seqs
     #my $len = length($seqs{0});
     foreach my $ialt (@$empty_ialts) {
         $seqs{$ialt} = '-' x $len;
