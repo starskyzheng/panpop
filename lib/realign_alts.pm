@@ -278,7 +278,7 @@ sub alt_alts_to_muts {
     my %muts;
     my $aln_seqlen = length( $$alts[0] );
     foreach my $ialt (0..$max_alts) {
-        my $seq = $$alts[$ialt] // die $ialt;
+        my $seq = $$alts[$ialt] // die "$ialt not in alts: " . Dumper $alts;
         my $l = length($seq);
         confess("length:  $l != $aln_seqlen") if $l != $aln_seqlen;
         tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
@@ -711,6 +711,7 @@ sub read_fa_fh {
         }
         $seqs{$seqid_now} .= $_;
     }
+    return undef if !%seqs; # no seqs
     close $fh;
     my $i_not_empty = 0;
     my $len;
