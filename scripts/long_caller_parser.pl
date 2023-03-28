@@ -27,7 +27,7 @@ Usage: $0 -i <in.vcf> -r <ref.fa> -o <out.vcf>
     -i, --in <in.vcf>       input vcf file
     -r, --ref <ref.fa>      reference fasta file
     -o, --out <out.vcf>     output vcf file
-    -O, --out_inv <out.bed> output inv bed file
+    -O, --out_inv <out.bed> output inv bed file (if not defined, will not split inversions)
     -s, --software <str>    software name: pbsv, svim, cutesv, sniffles2
     -h, --help              print this help message
     --max_len <int>         max length of SV, default $max_len
@@ -54,7 +54,10 @@ GetOptions (
 &help() if $opt_help;
 &help("--in not defined") unless defined $in;
 &help("--out not defined") unless defined $out;
-&help("--out_inv not defined") unless defined $out_inv;
+#&help("--out_inv not defined") unless defined $out_inv;
+unless (defined $out_inv) {
+    say STDERR "Warning: --out_inv not defined, will not split inversions";
+}
 #&help("--software not defined") unless defined $software;
 &help("--ref not defined") unless defined $ref_fasta_file;
 
@@ -66,9 +69,9 @@ my $ref_fasta;
 $ref_fasta = &read_ref_fasta($ref_fasta_file) if defined $ref_fasta_file;
 my $I = open_in_fh($in);
 my $O = open_out_fh($out);
-my $inv_bed = new zzBed({outfile=>$out_inv});
-#my $inv_bed = new zzBed({outfile=>$out_inv, max_len=>$max_len});
-#my $OB = open_out_fh($out_inv);
+my $inv_bed;
+$inv_bed = new zzBed({outfile=>$out_inv}) if defined $out_inv;
+#$inv_bed = new zzBed({outfile=>$out_inv, max_len=>$max_len});
 my @header;
 
 LINE:while(<$I>) { # vcf-header
@@ -120,8 +123,11 @@ LINE:while(<$I>) { # bed
             next LINE if $dp < $min_dp;
             &Update_ref_alt(\@F, 'INS');
         } elsif( $F[4] eq '<INV>' ) {
-            #&Update_ref_alt(\@F, 'INV');
-            $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            if(defined $out_inv) {
+                $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            } else {
+                &Update_ref_alt(\@F, 'INV');
+            }
         } elsif( $F[4] eq '<DUP>' ) {
             next LINE if $dp < $min_dp;
             &Update_ref_alt(\@F, 'DUP');
@@ -138,8 +144,11 @@ LINE:while(<$I>) { # bed
             next LINE if $dp < $min_dp;
             &Update_ref_alt(\@F, 'DUP');
         } elsif( $F[4] eq '<INV>') {
-            #&Update_ref_alt(\@F, 'INV');
-            $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            if(defined $out_inv) {
+                $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            } else {
+                &Update_ref_alt(\@F, 'INV');
+            }
         } else {
             # say STDERR "unknown type: @F";
             next LINE;
@@ -152,7 +161,11 @@ LINE:while(<$I>) { # bed
             next LINE if $dp < $min_dp;
             # do nothing
         } elsif( $svid =~ /^svim.INV\.\w+$/ ) {
-            $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            if (defined $out_inv) {
+                $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            } else {
+                &Update_ref_alt(\@F, 'INV');
+            }
         } elsif( $F[4]=~m/^<DUP/) {
             next LINE if $dp < $min_dp;
             &Update_ref_alt(\@F, 'DUP');
@@ -168,8 +181,11 @@ LINE:while(<$I>) { # bed
             next line if $dp < $min_dp;
             &Update_ref_alt(\@F, 'DUP');
         } elsif( $F[4] eq '<INV>' ) {
-            #&Update_ref_alt(\@F, 'INV');
-            $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            if (defined $out_inv) {
+                $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            } else {
+                &Update_ref_alt(\@F, 'INV');
+            }
         } else {
             next LINE;
         }
@@ -185,10 +201,12 @@ LINE:while(<$I>) { # bed
     say $O join "\t", @F;
 }
 
+if (defined $out_inv) {
+    $inv_bed->sort_bed();
+    $inv_bed->merge_bed();
+    $inv_bed->print_bed();
+}
 
-$inv_bed->sort_bed();
-$inv_bed->merge_bed();
-$inv_bed->print_bed();
 
 exit;
 
