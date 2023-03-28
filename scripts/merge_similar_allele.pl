@@ -32,7 +32,6 @@ use zzIO;
 use Data::Dumper;
 use Tie::CharArray;
 use MCE::Flow;
-use MCE::Loop;
 use MCE::Candy;
 use MCE::Shared;
 use MCE::Mutex;
