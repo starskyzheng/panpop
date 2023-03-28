@@ -6,37 +6,100 @@ require strict;
 require warnings;
 use v5.10;
 no warnings qw( experimental::smartmatch );
+use Carp qw/confess carp/; # carp=warn;confess=die
 
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 
 use Data::Dumper;
+use MCE::Mutex;
 use Carp;
 
 use zzIO;
+
+our $use_mcl = 1;
+if($use_mcl==1) {
+    #use Algorithm::MCL;
+    use zzmcl;
+}
 
 sub new {
     my ($class, $args) = @_;
     my %args = %$args;
     confess 'Identity::new usage : $args{nseqs}' unless
-            exists $args{nseqs};
-    my $nseqs = $args{nseqs};
+            exists $args{seqs_maxi};
     my $self={
-        _nseqs => $args{nseqs},
+        _seqs_maxi => $args{seqs_maxi},
         groups => [],
-        lock=>undef,
+        pair2indentities => {},
+        parallel => 0,
+        mcl_group_threshold_diff => $args{mcl_group_threshold_diff} // 20,
+        mcl_group_threshold_identity => $args{mcl_group_threshold_identity} // 0.8,
+        seqs => $args{seqs} // undef,
+        lock => undef,# => MCE::Mutex->new,
+        use_mcl => $args{use_mcl} // 0,
     };
     bless($self, $class || ref($class));
+    $self->cal_seq_lens() if defined $self->{seqs};
     return $self;
 }
 
-sub addpair() {
-    my ($self, $id1, $id2) = @_;
-    my $lock = $self->{lock};
-    if (defined $lock) {
-        $lock->lock();
+sub cal_seq_lens {
+    my ($self)  = @_;
+    my $seqs = $self->{seqs};
+    my $seqs_maxi = $self->{_seqs_maxi};
+    my $seq_lens = [];
+    for(my $i=0; $i < $seqs_maxi; $i++) {
+        my $seq = $$seqs[$i];
+        my $len = length($seq);
+        $$seq_lens[$i] = $len;
     }
+    $self->{seq_lens} = $seq_lens;
+}
+
+sub addpair {
+    my ($self, $id1, $id2, $indentity) = @_;
+    if($use_mcl==1) {
+        $self->addpair_mcl($id1, $id2, $indentity);
+    } else {
+        $self->addpair_simple($id1, $id2, $indentity) if $indentity > 0;
+    }
+}
+
+sub init_pair2indentities {
+    # set all pair to 0
+    my ($self) = @_;
+    my $nseqs = $self->{_seqs_maxi};
+    my $pair2indentities = $self->{pair2indentities};
+    for(my $i=0; $i < $nseqs; $i++) {
+        for(my $j=$i+1; $j < $nseqs; $j++) {
+            next if $i>=$j;
+            my $pair = "$i:$j";
+            $$pair2indentities{$pair} = 0;
+        }
+    }
+}
+
+sub addpair_mcl {
+    my ($self, $id1, $id2, $indentity) = @_;
+    $indentity //= 1;
+    # say STDERR "add pair: $id1 $id2 $indentity";
+    # must: $id1 < $id2
+    ($id1, $id2) = ($id2, $id1) if ($id1 > $id2);
+    my $pair = "$id1:$id2";
+    my $pair2indentities = $self->{pair2indentities};
+    $$pair2indentities{$pair} = $indentity;
+    # say STDERR Dumper $pair2indentities;
+}
+
+sub addpair_simple {
+    my ($self, $id1, $id2, $indentity) = @_;
     my $groups = $self->{groups};
+    ($id1, $id2) = ($id2, $id1) if ($id1 > $id2);
+    my $pair = "$id1:$id2";
+    my $pair2indentities = $self->{pair2indentities};
+    $$pair2indentities{$pair} = $indentity;
+    return if $indentity <= 0;
     ADDPAIRREDO:
     my $id1g = $self->is_in_group($id1);
     my $id2g = $self->is_in_group($id2);
@@ -56,43 +119,7 @@ sub addpair() {
         # merge two groups
        $self->merge_groups( [$id1g, $id2g] );
     }
-    if (defined $lock) {
-        $lock->unlock();
-    }
 }
-
-sub needs_run {
-    my ($self, $id1, $id2) = @_;
-    my $id1g = $self->is_in_group($id1);
-    my $id2g = $self->is_in_group($id2);
-    if ( ref($id1g) eq '' and ref($id2g) eq '' and 
-            $id1g eq $id2g and 
-            $id1g != -1 and $id2g != -1 ) {
-        return 0; # no need run
-    } else {
-        return 1; # need run
-    }
-}
-
-sub get_final_groups {
-    my ($self) = @_;
-    my $groups = $self->{groups};
-    my $nseqs = $self->{_nseqs};
-    my $max_groupsi = scalar(@$groups)-1;
-    my %ids_ingroup;
-    foreach my $i (0..$max_groupsi) {
-        foreach my $id ($$groups[$i]->@*) {
-            $ids_ingroup{$id}++;
-        }
-    }
-    foreach my $id (0..$nseqs) {
-        if (! exists $ids_ingroup{$id}) {
-            push @$groups, [$id];
-        }
-    }
-    return $groups;
-}
-
 
 sub merge_groups {
     my ($self, $tomerge) = @_;
@@ -104,6 +131,49 @@ sub merge_groups {
         splice @$groups, $ig, 1;
     }
 }
+
+sub needs_run {
+    my ($self, $id1, $id2, $check_len) = @_;
+    if($check_len) {
+        my $seq_lens = $self->{seq_lens};
+        my $len1 = $$seq_lens[$id1];
+        my $len2 = $$seq_lens[$id2];
+        my $diff = abs($len1-$len2);
+        my $min_len = $len1 < $len2 ? $len1 : $len2;
+        if ($diff > $self->{mcl_group_threshold_diff}) {
+            $self->addpair($id1, $id2, 0);
+            return 0;
+        } elsif($diff > $self->{mcl_group_threshold_identity} * $min_len) {
+            $self->addpair($id1, $id2, 0);
+            return 0;
+        } elsif($len1 == 0 and $len2  == 0) {
+            $self->addpair($id1, $id2, 1);
+            return 0;
+        } elsif($len1 == 0 or $len2  == 0) {
+            $self->addpair($id1, $id2, 0);
+            return 0;
+        }
+    }
+    my $id = "$id1:$id2";
+    my $pair2indentities = $self->{pair2indentities};
+    if($use_mcl==1) { # mcl mode
+        return 0 if exists $$pair2indentities{$id};
+        return 1; # force need run
+    } else { # simple mode
+        return 0 if exists $$pair2indentities{$id};
+        my $id1g = $self->is_in_group($id1);
+        my $id2g = $self->is_in_group($id2);
+        if ( ref($id1g) eq '' and ref($id2g) eq '' and 
+                $id1g eq $id2g and 
+                $id1g != -1 and $id2g != -1 ) {
+            return 0; # no need run, in same group
+        } else {
+            return 1; # need run
+        }
+    }
+}
+
+
 
 sub is_in_group {
     my ($self, $id) = @_;
@@ -124,49 +194,131 @@ sub is_in_group {
     }
 }
 
+sub get_final_groups {
+    my ($self) = @_;
+    if($use_mcl==1) {
+        return $self->get_final_groups_mcl();
+    } else {
+        return $self->get_final_groups_simple();
+    }
+}
 
-=old_mcl
-use Algorithm::MCL;
-sub cal_group_by_mcl {
-    my ($items, $max_refaltsi) = @_;
-    say STDERR '$items: ' . Dumper $items;
-    my $mcl1 = Algorithm::MCL->new();
-    my $need_cal=0;
+sub get_final_groups_simple {
+    my ($self) = @_;
+    my $groups = $self->{groups};
+    my $nseqs = $self->{_seqs_maxi};
+    my $max_groupsi = scalar(@$groups)-1;
+    my %ids_ingroup;
+    foreach my $i (0..$max_groupsi) {
+        foreach my $id ($$groups[$i]->@*) {
+            $ids_ingroup{$id}++;
+        }
+    }
+    # single id with no group
+    foreach my $id (0..$nseqs) {
+        if (! exists $ids_ingroup{$id}) {
+            push @$groups, [$id];
+        }
+    }
+    return $groups;
+}
+
+
+sub get_final_groups_mcl {
+    my ($self) = @_;
+    my $pair2indentities = $self->{pair2indentities};
+    #say STDERR Dumper $pair2indentities;
+    if($self->{parallel}==1) {
+        my $pair2indentities2 = $pair2indentities->export({ unbless => 1 });
+        $self->{pair2indentities} = $pair2indentities2;
+        $pair2indentities = $pair2indentities2;
+    }
+    #say STDERR Dumper $pair2indentities;
+    #die Dumper $pair2indentities2;
+
+    # del 0 value from pair2indentities
+    foreach my $id (keys %$pair2indentities) {
+        delete $$pair2indentities{$id} if $$pair2indentities{$id} == 0;
+    }
+    my $min_group_count = 2;
+    #say STDERR "pair2indentities: " . Dumper $pair2indentities;
+    my @identites = sort {$a<=>$b} grep {defined} values %$pair2indentities;
+    my $maxi = scalar(@identites)-1;
+    my $threshold_i = 0;
+    my $groups;
+    while(1) {
+        my $threshold = $identites[$threshold_i]; # start from min
+        #say STDERR "$threshold_i / $maxi : $threshold";
+        if($threshold_i == $maxi) {
+            if(defined $groups) {
+                return $group;
+            } else {
+                return $self->get_final_groups_mcl_run($threshold);
+            }
+        }
+        my $groups = $self->get_final_groups_mcl_run($threshold);
+        my $group_count = scalar(@$groups);
+        if($group_count >= $min_group_count) {
+            return $groups;
+        }
+        my $add = int($maxi/10);
+        $add = 1 if $add < 1;
+        $threshold_i += $add;
+        if($threshold_i > $maxi) {
+            $threshold_i = $maxi;
+        }
+    }
+
+}
+
+sub get_final_groups_mcl_run {
+    my ($self, $mcl_group_threshold_identity) = @_;
+    $mcl_group_threshold_identity = $self->{mcl_group_threshold_identity} unless defined $mcl_group_threshold_identity;
+    my $nseqs = $self->{_seqs_maxi};
+    my $max_refaltsi = $nseqs;
+    my $items = $self->{pair2indentities};
+    #die Dumper $items;
+    #my ($items, $max_refaltsi) = @_;
+    #say STDERR '$items: ' . Dumper $items;
+    #my $mcl1 = Algorithm::MCL->new();
+    my $mcl1 = zzmcl->new({I=>2});
+    my $need_cal_mcl=0;
     my (%ids, %ids_mcl);
-    my @ref;
-    $ref[$_] = $_ foreach (0..$max_refaltsi);
     foreach my $pair (keys %$items) {
+        $pair =~ /^([^>]+):([^:]+)$/ or next;
         my $identity = $$items{$pair};
-        $pair =~ /^([^>]+):([^:]+)$/ or die $pair;
+        $identity = 0 if $identity < 0;
+        $identity = 1 if $identity > 1;
         my ( $id1, $id2) = ( int($1), int($2) );
-        $ids{$id1}++; $ids{$id2}++;
         next if $identity < $mcl_group_threshold_identity;
-        say STDERR "add edge: $id1 $id2";
-        $mcl1->addEdge(\$ref[$id1], \$ref[$id2]);
-        $need_cal++;
-        $ids_mcl{$id1}++; $ids_mcl{$id2}++;
+        #say STDERR join "\t", "add edge: ", $id1, $id2, $identity;
+        $mcl1->addEdge($id1, $id2, $identity);
+        $need_cal_mcl++;
+        #$ids_mcl{$id1}++; $ids_mcl{$id2}++;
     }
     my $mcl_clusters=[];
-    $mcl_clusters = $mcl1->run() if $need_cal>0;
-    #$mcl_clusters = [[sort keys %ids_mcl]];
+    $mcl_clusters = $mcl1->run() if $need_cal_mcl>0;
+    #say STDERR "mcl_clusters: " . Dumper $mcl_clusters;
     my @groups;
-    say STDERR '$mcl_clusters: ' . Dumper $mcl_clusters;
-    foreach my $id (keys %ids) {
-        unless ($id ~~ [keys %ids_mcl]) {
+    foreach my $mcl_cluster ( @$mcl_clusters ) {
+        #print "Cluster size: ". scalar @$cluster. "\n";
+        my @ids_now;
+        push @ids_now, $_ foreach @$mcl_cluster;
+        push @groups, \@ids_now;
+        $ids_mcl{$_}++ foreach @ids_now;
+    }
+    # single id with no group
+    foreach my $id (0..$max_refaltsi) {
+        unless (exists $ids_mcl{$id}) {
             push @groups, [int($id)];
             #say STDERR $id;
         }
     }
-    foreach my $mcl_cluster ( @$mcl_clusters ) {
-        #print "Cluster size: ". scalar @$cluster. "\n";
-        my @ids;
-        push @ids, $$_ foreach @$mcl_cluster;
-        push @groups, \@ids;
-    }
-    say STDERR '@groups: ' . Dumper \@groups;
+    #say STDERR '@groups: ' . Dumper \@groups;
+    $self->{groups} = \@groups;
+    #die;
     return \@groups;
 }
-=cut
 
 
 

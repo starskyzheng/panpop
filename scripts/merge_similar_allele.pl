@@ -30,9 +30,9 @@ use lib "$Bin/../lib";
 use Carp qw/confess carp/; # carp=warn;confess=die
 use zzIO;
 use Data::Dumper;
-use IPC::Open2;
 use Tie::CharArray;
 use MCE::Flow;
+use MCE::Loop;
 use MCE::Candy;
 use MCE::Shared;
 use MCE::Mutex;
@@ -44,7 +44,7 @@ use List::Util qw/ max min shuffle /;
 use File::Basename;
 use Tie::CharArray;
 
-use realign_alts qw/aln_halign/;
+use realign_alts qw/aln_halign process_alts_aln_only/;
 use read_config qw/read_config_yaml/;
 use Identity;
 
@@ -60,30 +60,42 @@ usage: perl $0 [parameters]
 --outvcf <file>
 --tmpdir <dir>
 --sv2pav_merge_identity_threshold <int>
+--sv2pav_merge_diff_threshold <int>
 --threads <int>
+--type <int>
+type bitcode:
+    0 for simple mode
+    1 for mcl mode
+    2 for fast and ambigous
 EOF
 }
 my ($opt_help, $invcf, $outvcf);
 my $mcl_group_threshold_identity = 0.8;
+my $mcl_group_threshold_diff = 20;
 my $tmp_dir_def = '/run/user/' . `id -u`; chomp $tmp_dir_def;
 our $tmp_dir = $tmp_dir_def;
 my $threads = 32;
 our $verb = 0;
 our $debug = 0;
+our $type_bitcode = 0;
 my $max_refalts_threshold = 16; # too big may slow down speed
 
+my $ARGVs = join " ", $0, @ARGV; 
 GetOptions (
         'help|h!' => \$opt_help,
         't|threads=i' => \$threads,
         'sv2pav_merge_identity_threshold=s' => \$mcl_group_threshold_identity,
+        'sv2pav_merge_diff_threshold=i' => \$mcl_group_threshold_diff,
         'i|invcf=s' => \$invcf,
         'o|outvcf=s' => \$outvcf,
         'T|tmpdir=s' => \$tmp_dir,
         'max_refalts_threshold=i' => \$max_refalts_threshold,
         'debug!' => \$debug,
+        'verb!' => \$verb,
+        'type=i' => \$type_bitcode,
 );
 
-
+my $use_mcl = $type_bitcode & 1;
 &help() unless $invcf and $outvcf;
 
 $tmp_dir = $tmp_dir_def if $tmp_dir eq 'Default';
@@ -97,31 +109,48 @@ my $O = open_out_fh($outvcf);
 while ( <$I> ){
     if ( /^#/ ){
         print $O $_;
-        last if /^#CHROM/;
+        if (/^#CHROM/) {
+            say $O qq(##CommandLine="$ARGVs");
+            last;
+        }
         next;
     }
 }
 
-my $lines_cpx = MCE::Shared->array();
+
+my $lines_cpx;
+
+
 
 if ($threads==1) {
+    $lines_cpx = zzarray->new();
     while(my $line = <$I>) {
-        my ($result) = &prase_line($line);
-        say $O $result if $result;
+        my ($result, $is_cpx) = &prase_line($line);
+        if ($is_cpx==1) {
+            $lines_cpx->push($result);
+        } else {
+            say $O $result if $result;
+        }
     }
 } else {
-    mce_flow_f {
-            chunk_size => 1,
-            max_workers => $threads,  
-            gather => MCE::Candy::out_iter_fh($O)
-        },
-        \&flt_mce,
-        $I;
+    $lines_cpx = MCE::Shared->array();
+    MCE::Flow->init(
+        chunk_size => 1,
+        max_workers => $threads,
+        gather => MCE::Candy::out_iter_fh($O)
+    );
+    mce_flow_f \&flt_mce, $I;
+    MCE::Flow->finish();
+    my $lines_cpx2 = $lines_cpx->export({ unbless => 1 });
+    undef $lines_cpx;
+    $lines_cpx = $lines_cpx2;
 }
 
-close $I;
+#close $O;
+#close $I; # cannot close here, or MCE::Flow will not work
 
-my $lines_cpx_len = $lines_cpx->len();
+
+my $lines_cpx_len = scalar(@$lines_cpx);
 if ($lines_cpx_len>0) {
     say STDERR "Now processing: lines_cpx_len lines: $lines_cpx_len !\n";
     foreach my $line (@$lines_cpx) {
@@ -171,6 +200,7 @@ sub prase_line {
     #my $random = time() . "_" . rand();
     #my $temp_prefile = "$tmp_dir/$random";
     my $groups = &get_identity_halign(\@ref_alts, $threads);
+    #die Dumper $groups;
     my ($replace, $newseqs) = &cal_maxlen_allele(\@ref_alts, $groups);
     my $newline = &buildline(\@F, $replace, $newseqs);
     return($newline, 0);
@@ -193,6 +223,7 @@ sub buildline {
             if ( ! exists $$replace{$a1} ) {
                 say STDERR "!!!!!!";
                 say STDERR Dumper $replace;
+                say STDERR Dumper $F;
                 die "$a1";
             }
             my $a1n = $$replace{$a1} // die "!!!!!!!!$a1 @$F";
@@ -247,37 +278,85 @@ sub cal_maxlen_allele {
 
 sub get_identity_halign {
     my ($seqs, $threads) = @_;
+    
+    if($threads>1) {
+
+    }
+
     $threads//=1;
     my $len = scalar(@$seqs) - 1;
-    my $obj = new Identity({nseqs=>$len});
-    #return {"@ids"=>-1} if length( $$seqs{$ids[0]} ) > 1000; ######## DEBUG
+    my $obj = new Identity({seqs_maxi=>$len, seqs=>$seqs, 
+                    mcl_group_threshold_diff=>$mcl_group_threshold_diff, 
+                    mcl_group_threshold_identity=>$mcl_group_threshold_identity,
+                    use_mcl => $use_mcl, });
+    if($threads>1) {
+        $obj->{parallel} = 1;
+        #$obj->init_pair2indentities();
+    }
+    &run_get_identity_halign_all($seqs, $obj, $type_bitcode & 2);
+    #die Dumper $obj->{pair2indentities};
     my @pairs;
     foreach my $i1 (0..$len) {
         foreach my $i2 ($i1..$len) {
             next if $i2<=$i1;
+            next if $obj->needs_run($i1, $i2, 1)==0; # no needs to run
             push @pairs, "$i1:$i2";
         }
     }
-    if($threads==1) {
-        foreach my $pair (shuffle @pairs) {
-            &run_get_identity_halign_pair($pair, $seqs, $obj);
+    #say STDERR "paris length: " . scalar(@pairs);
+    # die Dumper \@pairs;
+    if(@pairs) {
+        if($threads==1) {
+            foreach my $pair (shuffle @pairs) {
+                &run_get_identity_halign_pair($pair, $seqs, $obj);
+            }
+        } else {
+            my $mutex = MCE::Mutex->new;
+            $obj->{lock} = $mutex;
+            my $pair2indentities_ori = $obj->{pair2indentities};
+            my $group_ori = $obj->{groups};
+            #$obj->{pair2indentities} = MCE::Shared->hash({_DEEPLY_ => 1}, %$pair2indentities_ori);
+            #$obj->{groups} = MCE::Shared->array({_DEEPLY_ => 1}, @$group_ori);
+            $obj->{pair2indentities} = MCE::Shared->share({_DEEPLY_ => 1}, $pair2indentities_ori);
+            $obj->{groups} = MCE::Shared->share({_DEEPLY_ => 1}, $group_ori);
+            say STDERR "start MCE::Flow, count: " . scalar(@pairs);
+            MCE::Flow->init(
+               chunk_size => 1,
+               max_workers => $threads, 
+            );
+            mce_flow sub{ &run_get_identity_halign_pair($_, $seqs, $obj) }, \@pairs;
+            MCE::Flow->finish;
         }
-    } else {
-        my $mutex = MCE::Mutex->new;
-        $obj->{lock} = $mutex;
-        mce_flow {
-                chunk_size => 1,
-                max_workers => $threads, 
-            },
-            sub{ &run_get_identity_halign_pair($_, $seqs, $obj, $mutex) },
-            \@pairs;
     }
+    # die Dumper $obj->{groups};
     my $groups = $obj->get_final_groups();
+    #die Dumper $groups;
     return($groups);
 }
 
+sub run_get_identity_halign_all {
+    my ($alts, $obj, $fastmode) = @_;
+    $fastmode //= 0;
+    my $max_alts = scalar(@$alts)-1;
+    my ($aln_alts, $reflen) = &process_alts_aln_only($alts, -1);
+    #die Dumper $aln_alts;
+    foreach my $id1 (0..$max_alts) {
+        foreach my $id2 ($id1..$max_alts) {
+            next if $id2<=$id1;
+            my ($identity, $diff, $gap) = &seq2identity([$$aln_alts[$id1], $$aln_alts[$id2]]);
+            if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff)  {
+                #$seq2identity{"$id1:$id2"} = $identity;
+                $obj->addpair($id1, $id2, $identity);
+            } elsif($fastmode>0) {
+                $obj->addpair($id1, $id2, 0);
+            }
+        }
+    }
+}
+
 sub run_get_identity_halign_pair {
-    my ($pair, $seqs, $obj) = @_;
+    my ($pair, $seqs, $obj, $mutex) = @_;
+    #my $mutex = $obj->{lock};
     my ($id1, $id2) = split(/:/, $pair);
     my $seq1 = $$seqs[$id1];
     my $len1 = length($seq1);
@@ -286,57 +365,77 @@ sub run_get_identity_halign_pair {
     my $seq2 = $$seqs[$id2];
     my $len2 = length($seq2);
     my $lendiff = abs($len1-$len2);
-    if ($seq1 eq '' and $seq2 eq '') {
-        say STDERR "WARN: seq for $id1 and $id2 Both empty, identity set to 1" if $verb;
-        $obj->addpair($id1, $id2);
-        return;
-    } elsif($seq1 eq '' or $seq2 eq '') {
-        say STDERR "WARN: seq for $id1 or $id2 is empty! identity set to 0" if $verb;
-        return;
-    } elsif ($lendiff>0.5*$len1 or $lendiff>0.5*$len2) {
-        say STDERR "WARN: lendiff for $id1 $id2 to large: $lendiff! identity set to 0" if $verb;
-        return;
-    } else {
-        my ($aln_exit_status, $aln_seqs) = aln_halign('HAlignC', [$seq1, $seq2], 1);
-        if ($aln_exit_status != 0) {
-            next;
-        }
-        my $identity = &seq2same($aln_seqs);
-        if ($identity > $mcl_group_threshold_identity) {
-            $obj->addpair($id1, $id2);
-        }
-        return;
+    #my ($aln_exit_status, $aln_seqs) = aln_halign('HAlignC', [$seq1, $seq2], 1);
+    my ($aln_seqs) = process_alts_aln_only([$seq1, $seq2], -1, -1);
+    my ($identity, $diff, $gap) = &seq2identity($aln_seqs);
+    #say STDERR "$identity";
+    if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff) {
+        $mutex->lock() if $mutex;
+        $obj->addpair($id1, $id2, $identity); # 多线程会出错
+        $mutex->unlock() if $mutex;
     }
+    return;
 }
 
-sub seq2same {
+sub seq2identity {
     my ($seqs) = @_;
     tie my @s1, 'Tie::CharArray', $$seqs[0];
     tie my @s2, 'Tie::CharArray', $$seqs[1];
     my $len1 = scalar(@s1);
     my $len2 = scalar(@s2);
     if ($len1 != $len2) {
-        confess "????";
+        confess "???? len not equal: $len1 $len2 @$seqs";
     }
     my $same=0;
+    my $score = 0;
     my $lenr1 = 0;
     my $lenr2 = 0;
+    my $gap = 0;
     for(my $i=0; $i < $len1; $i++) {
         my $b1 = $s1[$i];
         my $b2 = $s2[$i];
-        if ($b1 eq $b2 and $b1 ne '-') {
+        if ($b1 eq $b2 and $b1 ne '-') { # A/A
+            $score++;
             $same++;
+        } elsif ($b1 ne $b2 and ($b1 eq '-' or $b2 eq '-')) { # A/- or -/A
+            $score -= 0.5;
+             $gap++;
+        } elsif ($b1 eq '-' and $b2 eq '-') { # -/-
+            # nothing
+        } elsif ($b1 ne $b2 and ($b1 ne '-' and $b2 ne '-')) { # A/C
+            # nothing
+        } else {
+            confess "???? $b1 $b2";
         }
         $lenr1++ if $b1 ne '-';
         $lenr2++ if $b2 ne '-';
     }
-    my $meanlenr = ($lenr1+$lenr2)/2;
-    my $identity = $same/$meanlenr;
-    return($identity);
+    #my $meanlenr = ($lenr1+$lenr2)/2;
+    my $mexlenr = $lenr1 > $lenr2 ? $lenr1 : $lenr2; # max
+    my $diff = $mexlenr - $same;
+    my $identity = $same/$mexlenr;
+    return($identity, $diff, $gap);
 }
 
 
 
 
 
-
+{
+    package zzarray;
+    sub new {
+        my $class = shift;
+        my $self = [];
+        bless $self, $class;
+        return $self;
+    }
+    sub push {
+        my $self = shift;
+        my $item = shift;
+        push $self->@*, $item;
+    }
+    sub len {
+        my $self = shift;
+        return scalar $self->@*;
+    }
+}

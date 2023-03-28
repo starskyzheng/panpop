@@ -50,12 +50,13 @@ use vars qw(
         qw(
             process_alts
             aln_halign
+            process_alts_aln_only
         )
     ]
 );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-@EXPORT    = qw(process_alts aln_halign);
+@EXPORT    = qw(process_alts aln_halign process_alts_aln_only);
 
 
 my $famsa;
@@ -88,8 +89,8 @@ sub init {
     }
 
     $ALN_PARAMS_max_tryi = $main::config->{realign_max_try_times_per_method};
-    #$ALN_PARAMS{famsa} = "$famsa -t 1 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
-    $ALN_PARAMS{famsaP} = "$famsa -t 8 -medoidtree -gt upgma STDIN STDOUT 2>/dev/null";
+    #$ALN_PARAMS{famsa} = "$famsa -t 1 -medoidtree -gt upgma STDIN STDOUT -keep-duplicates 2>/dev/null";
+    $ALN_PARAMS{famsaP} = "$famsa -t 8 -medoidtree -gt upgma STDIN STDOUT -keep-duplicates 2>/dev/null";
     $ALN_PARAMS{HAlignC} = "C";
     $ALN_PARAMS{mafft} = "$mafft --auto --thread 4 - 2>/dev/null" if $mafft;
     $ALN_PARAMS{muscle} = "$muscle3 -maxiters 16 -diags 2>/dev/null" if $muscle3;
@@ -181,6 +182,8 @@ sub aln_pipeline {
     my ($selsoft, $alts, $max_alts) = @_;
     my $aln_param = $ALN_PARAMS{$selsoft} // confess();
     my $aln_pid = open2(my $chld_out, my $chld_in, "$aln_param");
+    #die "$aln_pid: $chld_in $chld_out";
+    #die $aln_param;
     my @empty_ialt;
     foreach my $ialt(0..$max_alts) {
         my $alt_seq = $$alts[$ialt];
@@ -188,6 +191,7 @@ sub aln_pipeline {
             push @empty_ialt, $ialt;
             next;
         }
+        #die $aln_pid;
         say $chld_in ">$ialt";
         say $chld_in $alt_seq;
     }
@@ -198,16 +202,30 @@ sub aln_pipeline {
     return($aln_exit_status, $aln_alts);
 }
 
+sub cal_alts_max_len {
+    my ($alts) = @_;
+    my $max_len = 0;
+    foreach my $alt(@$alts) {
+        my $len = length($alt);
+        $max_len = $len if $len>$max_len;
+    }
+    return($max_len);
+}
 
-
-
-sub process_alts {
+sub process_alts_aln_only {
     my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
-    say STDERR "Ori no align alts: " . Dumper $alts if $debug;
-    #say STDERR $max_alts;
-    if($max_alts==1) { # biallic, to skip calculation
-        my %ret = (0=>$alts);
-        return(\%ret, length($$alts[0]));
+    my $t=$alt_max_length; #######
+    undef $alt_max_length;
+    if($max_alts == -1) {
+        $max_alts = scalar(@$alts)-1;
+    } elsif($max_alts==1) { # biallic, to skip calculation
+        return({0=>$alts}, length($$alts[0]));
+    } elsif (!defined $max_alts) {
+        $max_alts = scalar(@$alts)-1;
+        return({0=>$alts}, length($$alts[0])) if $max_alts==1;
+    }
+    if(! defined $alt_max_length) {
+        $alt_max_length = &cal_alts_max_len($alts);
     }
     my %lefti;
     $lefti{$_}=$ALN_PARAMS_max_tryi foreach keys %ALN_PARAMS; # max try 3 times
@@ -217,6 +235,7 @@ sub process_alts {
     }
     REDO_process_alts:
     my ($selsoft, $tryi) = &select_aln_software(\%lefti, $alt_max_length, $force_aln_method);
+    #say STDERR $selsoft;
     return undef unless defined $selsoft;
     my ($aln_exit_status, $aln_alts);
     if ($selsoft =~/^HAlign/) {
@@ -232,6 +251,18 @@ sub process_alts {
         carp "Warn! no alt[0] from aln software($selsoft)! redo! No. $tryi";
         goto REDO_process_alts;
     }
+    return($aln_alts);
+}
+
+
+sub process_alts {
+    my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
+    if($max_alts==1) { # biallic, to skip calculation
+        my %ret = (0=>$alts);
+        return(\%ret, length($$alts[0]));
+    }
+    say STDERR "Ori no align alts: " . Dumper $alts if $debug;
+    my $aln_alts = &process_alts_aln_only($alts, $max_alts, $alt_max_length, $force_aln_method);
     say STDERR "alignd alts: " . Dumper($aln_alts) if $debug;
     my ($muts, $aln_seqlen) = &alt_alts_to_muts($aln_alts, $max_alts);
     return($muts, $aln_seqlen);
