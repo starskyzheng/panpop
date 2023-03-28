@@ -244,11 +244,11 @@ sub process_alts_aln_only {
         ($aln_exit_status, $aln_alts) = &aln_pipeline($selsoft, $alts, $max_alts);
     }
     if( $aln_exit_status!=0 ) {
-        carp "Warn! aln software($selsoft) exit status($aln_exit_status)! redo! No. $tryi";
+        say STDERR "Warn! aln software($selsoft) exit status($aln_exit_status)! redo! No. $tryi";
         goto REDO_process_alts;
     }
     unless (defined $aln_alts and exists $$aln_alts[0]) {
-        carp "Warn! no alt[0] from aln software($selsoft)! redo! No. $tryi";
+        say STDERR "Warn! no alt[0] from aln software($selsoft)! redo! No. $tryi";
         goto REDO_process_alts;
     }
     return($aln_alts);
@@ -714,9 +714,15 @@ sub read_fa_fh {
     close $fh;
     my $i_not_empty = 0;
     my $len;
+    my $max_i = max(keys %seqs);
     while(!defined $len) {
-        next unless exists $seqs{$i_not_empty};
+        if (! exists $seqs{$i_not_empty}) {
+            $i_not_empty++;
+            last if $i_not_empty > $max_i;
+            next;
+        }
         $len = length($seqs{$i_not_empty});
+        
         last;
     }
     die "??? all empty?" if !defined $len;

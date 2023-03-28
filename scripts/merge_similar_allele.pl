@@ -120,7 +120,6 @@ while ( <$I> ){
 my $lines_cpx;
 
 
-
 if ($threads==1) {
     $lines_cpx = zzarray->new();
     while(my $line = <$I>) {
@@ -191,6 +190,8 @@ sub prase_line {
     my $ref = $F[3];
     my @alts = split(/,/, $F[4]);
     my @ref_alts = ($ref, @alts);
+    # * to -
+    @ref_alts = map { s/^\*$//g; $_ } map { s/^-$//g; $_ } @ref_alts;
     my $max_refaltsi = scalar(@ref_alts)-1;
     if ($force_cpx==0 and $max_refaltsi >= $max_refalts_threshold) {
         say STDERR "Too much alleles at $F[0]:$F[1] ($max_refaltsi)! push to lines_cpx" if $debug==1;
@@ -277,11 +278,6 @@ sub cal_maxlen_allele {
 
 sub get_identity_halign {
     my ($seqs, $threads) = @_;
-    
-    if($threads>1) {
-
-    }
-
     $threads//=1;
     my $len = scalar(@$seqs) - 1;
     my $obj = new Identity({seqs_maxi=>$len, seqs=>$seqs, 
