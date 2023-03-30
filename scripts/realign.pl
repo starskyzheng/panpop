@@ -405,7 +405,8 @@ sub get_ref_substr_seq {
     die unless defined $win_end;
     die unless defined $win_start;
     if ( exists $$REF_SEQS{$chr} ){
-        my $ref = substr($$REF_SEQS{$chr}, $win_start-1, $win_end - $win_start + 1);
+        my $ref_seq_now = \$$REF_SEQS{$chr};
+        my $ref = substr($$ref_seq_now, $win_start-1, $win_end - $win_start + 1);
         return $ref;
     } elsif ( $is_aug==0 and exists $$NONREF_SEQS{$chr} ) {
         my $dist_min=999999999;
