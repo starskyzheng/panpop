@@ -89,7 +89,7 @@ GetOptions (
         'T|tmpdir=s' => \$tmp_dir,
         'max_refalts_threshold=i' => \$max_refalts_threshold,
         'debug!' => \$debug,
-        'verb!' => \$verb,
+        'v|verb!' => \$verb,
         'type=i' => \$type_bitcode,
 );
 
@@ -291,10 +291,7 @@ sub get_identity_halign {
                     mcl_group_threshold_diff=>$mcl_group_threshold_diff, 
                     mcl_group_threshold_identity=>$mcl_group_threshold_identity,
                     use_mcl => $use_mcl, });
-    if($threads>1) {
-
-        #$obj->init_pair2indentities();
-    }
+    #$obj->init_pair2indentities() if($threads>1);
     &run_get_identity_halign_all($seqs, $obj, $type_bitcode & 2);
     #die Dumper $obj->{pair2indentities};
     my @pairs;
@@ -347,6 +344,7 @@ sub run_get_identity_halign_all {
         foreach my $id2 ($id1..$max_alts) {
             next if $id2<=$id1;
             my ($identity, $diff, $gap) = &seq2identity([$$aln_alts[$id1], $$aln_alts[$id2]]);
+            say STDERR "get_identity_halign : $id1 $id2 $identity $diff $gap" if $verb;
             if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff)  {
                 #$seq2identity{"$id1:$id2"} = $identity;
                 $obj->addpair($id1, $id2, $identity);
