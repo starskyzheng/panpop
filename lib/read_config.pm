@@ -58,7 +58,7 @@ sub read_config_yaml {
         delete $config->{$key} if ref($config->{$key}) eq '' and $config->{$key} eq '';
     }
     foreach my $bin (qw/stmsa bcftools vg tabix muscle3 bgzip famsa
-                            mafft minigraph stretcher/) {
+                            mafft minigraph/) {
         my $path = $config->{$bin};
         next unless defined $path and $path ne '';
         my $bin_path_new = "$Bin/../$path";

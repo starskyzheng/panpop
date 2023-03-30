@@ -19,17 +19,15 @@ graph: 'Ref'
 # required:
 famsa: "misc_arm/famsa"
 stmsa: "misc_arm/stmsa"
+muscle3: "misc_arm/muscle"
 bcftools: "misc_arm/bcftools"
 vg: "misc_arm/vg"
 tabix: "misc_arm/tabix"
 bgzip: "misc_arm/bgzip"
-seqs2identity: "src/gotoh/align"
 ## optional but highly recommanded:
 mafft: ""
-muscle3: "misc/muscle"
-seqs2identity: ""
 # only for build_graph.pl
-minigraph: "misc/minigraph"
+minigraph: "misc_arm/minigraph"
 
 
 #################### Filter Parameters ####################

@@ -19,17 +19,15 @@ graph: 'Ref'
 # required:
 famsa: "misc/famsa"
 stmsa: "misc/stmsa_0.2.1-ubuntu.20.04_amd64.out"
+muscle3: "misc/muscle"
 bcftools: "misc/bcftools"
 vg: "misc/vg"
 tabix: "misc/tabix"
 bgzip: "misc/bgzip"
-seqs2identity: "src/gotoh/align"
 # optional but highly recommanded:
 mafft: "misc/mafft-linux64/mafft.bat"
-muscle3: "misc/muscle"
 # only for build_graph.pl
 minigraph: "misc/minigraph"
-seqs2identity: ""
 
 
 

@@ -49,7 +49,6 @@ use Identity;
 
 our $config = read_config_yaml("$Bin/../config.yaml");
 
-my $seqs2identity = $$config{'seqs2identity'};
 my $stretcher = $$config{'stretcher'};
 
 sub help {
