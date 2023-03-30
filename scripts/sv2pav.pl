@@ -5,7 +5,7 @@
 #
 #        USAGE: ./sv2snp_indel.pl  
 #
-#  DESCRIPTION: 
+#  DESCRIPTION:  Merge small alleles for SVs
 #
 #      OPTIONS: ---
 # REQUIREMENTS: ---
@@ -38,8 +38,9 @@ use MCE::Candy;
 my ($in, $out, $opt_help);# = @ARGV;
 my $thread = 1;
 my $sv_min_dp = 10;
-my $max_len_tomerge = 2;
+my $max_len_tomerge = 5;
 my $debug = 0;
+my $min_diff_fold = 5;
 
 sub usage {
     print <<EOF;
@@ -50,9 +51,11 @@ Options:
     -t | --threads  	thread number, default: $thread
     --sv_min_dp         sv_min_dp, default: $sv_min_dp
     --max_len_tomerge   max_len_tomerge, default: $max_len_tomerge
+    --min_diff_fold     min different length (fold) to merge, default: $min_diff_fold
 EOF
     exit;
 }
+$min_diff_fold = 1 if $min_diff_fold < 1;
 
 GetOptions (
     'help|h!' => \$opt_help,
@@ -111,40 +114,10 @@ sub process_line {
     my @alts = split /,/, $F[4];
     die $line unless @alts;
     my @ref_alts = ($ref, @alts);
-    my $reflen = length $ref;
-    my $alt_max_len = max map {length} @alts;
-    my $alt_min_len = min map {length} @alts;
-    my %replace;
-    if ($reflen >= $sv_min_dp and $alt_max_len>=$sv_min_dp) {
-        # cannot determine type
-    } elsif ($reflen <= $sv_min_dp and $alt_max_len<=$sv_min_dp) {
-        # cannot determine type
-    } elsif ($reflen <= $max_len_tomerge and $alt_max_len >= $sv_min_dp) { # ins
-        foreach my $ialt (1..$#ref_alts) {
-            my $len = length $ref_alts[$ialt];
-            if ($len <= $max_len_tomerge) {
-                $replace{$ialt} = 0 if $ialt != 0;
-            }
-        }
-    } elsif ($reflen >= $sv_min_dp and $alt_min_len <= $max_len_tomerge) { # del
-        my $shortest_ialt = 1;
-        my $shortest_len = length $alts[0];
-        foreach my $ialt (1..$#ref_alts) {
-            my $len = length $ref_alts[$ialt];
-            if ($len < $shortest_len) {
-                $shortest_ialt = $ialt;
-                $shortest_len = $len;
-            }
-        }
-        foreach my $ialt (0..$#ref_alts) {
-            my $len = length $ref_alts[$ialt];
-            if ($len <= $max_len_tomerge) {
-                $replace{$ialt} = $shortest_ialt if $ialt != $shortest_ialt;
-            }
-        }
-    }
-    my ($replace2, $newalts) = &gen_replace2(\%replace, scalar(@ref_alts)-1);
-    #say STDERR Dumper \%replace;
+    #my $replace = &gen_replace_by_type($ref, \@alts, \@ref_alts);
+    my $replace = &gen_replace_by_length_only($ref, \@alts, \@ref_alts);
+    #say STDERR Dumper $replace;
+    my ($replace2, $newalts) = &gen_replace2($replace, scalar(@ref_alts)-1);
     foreach my $isid (9..$#F) {
         my $alle_infos = $F[$isid];
         $alle_infos =~ /^([^:]+)(:|$)/ or die;
@@ -170,12 +143,102 @@ sub process_line {
         $F[4] = join ",", @ref_alts[@$newalts]; 
     }
     if($debug==1 and $F[1] eq '90651') { # debug
-        say STDERR "replace: " . Dumper \%replace;
+        say STDERR "replace: " . Dumper $replace;
         say STDERR "replace2: " . Dumper $replace2;
         say STDERR "newalts: " . Dumper $newalts;
         die;
     }
     return join("\t", @F);
+}
+
+sub gen_replace_by_length_only {
+    my ($ref, $alts, $ref_alts) = @_;
+    my $ref_alts_maxi = scalar(@$ref_alts)-1;
+    my $reflen = length $ref;
+    my @lengths = map {length} @$ref_alts;
+    my @lengths_alts = @lengths[1..$ref_alts_maxi];
+    my $alt_max_len = max @lengths_alts;
+    my $alt_min_len = min @lengths_alts;
+    my $ref_alt_max_len = max($reflen, $alt_max_len);
+    my $ref_alt_min_len = min($reflen, $alt_min_len);
+    my $diff_len = abs($reflen - $alt_max_len);
+    my %replace;
+    if ($ref_alt_max_len >= $sv_min_dp and $ref_alt_min_len <= $max_len_tomerge and
+            $ref_alt_min_len*$min_diff_fold <= $ref_alt_max_len ) {
+        # merge small alles
+        my $max_len_tomerge_now = min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold));
+        if($reflen < $max_len_tomerge_now) {
+            # merge small alles to ref
+            foreach my $ialt (1..$ref_alts_maxi) {
+                $replace{$ialt} = 0 if $lengths[$ialt] <= $max_len_tomerge_now;
+            }
+        } else {
+            my $shortest_ialt;
+            my $shortest_len = 999999999;
+            my @short_ialts;
+            foreach my $ialt (1..$ref_alts_maxi) {
+                my $len = $lengths[$ialt];
+                if($len <= $max_len_tomerge_now) {
+                    push @short_ialts, $ialt;
+                }
+                if ($len < $shortest_len) {
+                    $shortest_ialt = $ialt;
+                    $shortest_len = $len;
+                }
+            }
+            if (scalar(@short_ialts) >= 2) {
+                foreach my $ialt (@short_ialts) {
+                    $replace{$ialt} = $shortest_ialt if $ialt != $shortest_ialt;
+                }
+            }
+        }
+    }
+    return \%replace;
+}
+
+sub gen_replace_by_type {
+    my ($ref, $alts, $ref_alts) = @_;
+    my $ref_alts_maxi = scalar(@$ref_alts)-1;
+    my $reflen = length $ref;
+    my $alt_max_len = max map {length} @$alts;
+    my $alt_min_len = min map {length} @$alts;
+    my $ref_alt_max_len = max($reflen, $alt_max_len);
+    my $ref_alt_min_len = min($reflen, $alt_min_len);
+    my $diff_len = abs($reflen - $alt_max_len);
+    my %replace;
+    if ($reflen >= $sv_min_dp and $alt_max_len>=$sv_min_dp) {
+        # cannot determine type
+    } elsif ($reflen <= $sv_min_dp and $alt_max_len<=$sv_min_dp) {
+        # cannot determine type
+    } elsif ($reflen <= $max_len_tomerge and $alt_max_len >= $sv_min_dp and 
+            $reflen*$min_diff_fold <= $alt_max_len) { # ins
+        my $max_len_tomerge_now = min($max_len_tomerge, int($alt_max_len/$min_diff_fold));
+        foreach my $ialt (1..$ref_alts_maxi) {
+            my $len = length $$ref_alts[$ialt];
+            if ($len <= $max_len_tomerge_now) {
+                $replace{$ialt} = 0 if $ialt != 0;
+            }
+        }
+    } elsif ($reflen >= $sv_min_dp and $alt_min_len <= $max_len_tomerge and
+            $alt_min_len*$min_diff_fold <= $reflen) { # del
+        my $max_len_tomerge_now = min($max_len_tomerge, int($reflen/$min_diff_fold));
+        my $shortest_ialt = 1;
+        my $shortest_len = length $$alts[0];
+        foreach my $ialt (1..$ref_alts_maxi) {
+            my $len = length $$ref_alts[$ialt];
+            if ($len < $shortest_len) {
+                $shortest_ialt = $ialt;
+                $shortest_len = $len;
+            }
+        }
+        foreach my $ialt (0..$ref_alts_maxi) {
+            my $len = length $$ref_alts[$ialt];
+            if ($len <= $max_len_tomerge_now) {
+                $replace{$ialt} = $shortest_ialt if $ialt != $shortest_ialt;
+            }
+        }
+    }
+    return \%replace;
 }
 
 sub gen_replace2 {

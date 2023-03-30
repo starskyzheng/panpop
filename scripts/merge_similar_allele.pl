@@ -106,11 +106,13 @@ my $O = open_out_fh($outvcf);
 
 
 while ( <$I> ){
-    if ( /^#/ ){
-        print $O $_;
+    if ( /^#/ ) {
         if (/^#CHROM/) {
             say $O qq(##CommandLine="$ARGVs");
+            print $O $_;
             last;
+        } else {
+            print $O $_;
         }
         next;
     }
@@ -184,6 +186,7 @@ sub prase_line {
     $threads//=1;
     $force_cpx//=0;
     chomp $line;
+    return (undef, 0) if $line eq '' or $line =~ /^#/;
     #say STDERR "line::: ", $line;
     my @F = split(/\t/, $line);
     say STDERR "$F[0] $F[1]" if $debug; 
@@ -210,6 +213,11 @@ sub buildline {
     my ($F, $replace, $newseqs) = @_;
     my @newline = ( $F->@[0,1,2,3,4,5,6,7,8] );
     my $max_allei = scalar(@$newseqs)-1;
+    foreach my $allei (1..$max_allei) {
+        my $seq = $$newseqs[$allei];
+        $seq = '*' if $seq eq '' or $seq eq '-';
+        $$newseqs[$allei] = $seq;
+    }
     my $alts = join ",", $newseqs->@[1..$max_allei];
     $newline[4] = $alts;
     $newline[4] = "*" if $newline[4] eq '';

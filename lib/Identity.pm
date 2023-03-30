@@ -40,6 +40,7 @@ sub new {
         use_mcl => $args{use_mcl} // 0,
     };
     bless($self, $class || ref($class));
+    $self->{mcl_group_threshold_diff_percent} = 1 - $self->{mcl_group_threshold_identity};
     $self->cal_seq_lens() if defined $self->{seqs};
     return $self;
 }
@@ -49,7 +50,7 @@ sub cal_seq_lens {
     my $seqs = $self->{seqs};
     my $seqs_maxi = $self->{_seqs_maxi};
     my $seq_lens = [];
-    for(my $i=0; $i < $seqs_maxi; $i++) {
+    for(my $i=0; $i <= $seqs_maxi; $i++) {
         my $seq = $$seqs[$i];
         my $len = length($seq);
         $$seq_lens[$i] = $len;
@@ -134,16 +135,16 @@ sub merge_groups {
 
 sub needs_run {
     my ($self, $id1, $id2, $check_len) = @_;
-    if($check_len) {
+    if($check_len>0) {
         my $seq_lens = $self->{seq_lens};
-        my $len1 = $$seq_lens[$id1];
-        my $len2 = $$seq_lens[$id2];
+        my $len1 = $$seq_lens[$id1] // die;
+        my $len2 = $$seq_lens[$id2] // die;
         my $diff = abs($len1-$len2);
         my $min_len = $len1 < $len2 ? $len1 : $len2;
         if ($diff > $self->{mcl_group_threshold_diff}) {
             $self->addpair($id1, $id2, 0);
             return 0;
-        } elsif($diff > $self->{mcl_group_threshold_identity} * $min_len) {
+        } elsif($diff > $self->{mcl_group_threshold_diff_percent} * $min_len) {
             $self->addpair($id1, $id2, 0);
             return 0;
         } elsif($len1 == 0 and $len2  == 0) {
@@ -151,7 +152,7 @@ sub needs_run {
             return 0;
         } elsif($len1 == 0 or $len2  == 0) {
             $self->addpair($id1, $id2, 0);
-            return 0;
+           return 0;
         }
     }
     my $id = "$id1:$id2";
@@ -227,21 +228,19 @@ sub get_final_groups_simple {
 sub get_final_groups_mcl {
     my ($self) = @_;
     my $pair2indentities = $self->{pair2indentities};
-    #say STDERR Dumper $pair2indentities;
+    # say STDERR Dumper $pair2indentities;
     if($self->{parallel}==1) {
         my $pair2indentities2 = $pair2indentities->export({ unbless => 1 });
         $self->{pair2indentities} = $pair2indentities2;
         $pair2indentities = $pair2indentities2;
+        undef $pair2indentities2;
     }
-    #say STDERR Dumper $pair2indentities;
-    #die Dumper $pair2indentities2;
 
     # del 0 value from pair2indentities
     foreach my $id (keys %$pair2indentities) {
         delete $$pair2indentities{$id} if $$pair2indentities{$id} == 0;
     }
     my $min_group_count = 2;
-    #say STDERR "pair2indentities: " . Dumper $pair2indentities;
     my @identites = sort {$a<=>$b} grep {defined} values %$pair2indentities;
     my $maxi = scalar(@identites)-1;
     my $threshold_i = 0;
