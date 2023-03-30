@@ -10,7 +10,7 @@
   - [Quick Start](#example)
   - [Installation](#install)
   - [Parameters](#parameters)
-  - [Input GFA Reference file](#GFA_ref)
+  - [Input GFA Reference file](#gfa_ref)
 - [Citations](#cite)
 
 
@@ -76,7 +76,7 @@ All parameters were defined in `config.yaml` file
 
   `aug_nomut_min_dp`: In augment mode, if the average of depth of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Default is 3.
 
-## <a name=GFA_ref></a>Input GFA Reference file
+## <a name=gfa_ref></a>Input GFA Reference file
   Graph-genome should be [GFA format][gfa] and the name of the chromosome must be specified which should be numeric only.
   The GFA file to be run must contain a path line starting with `P`. Each `P` line represents one chromosome of the backbone genome.
   This following script can be used to generate or remove Non-Backbone paths:
