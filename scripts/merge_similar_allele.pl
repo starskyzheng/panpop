@@ -293,7 +293,7 @@ sub get_identity_halign {
                     mcl_group_threshold_identity=>$mcl_group_threshold_identity,
                     use_mcl => $use_mcl, });
     if($threads>1) {
-        $obj->{parallel} = 1;
+
         #$obj->init_pair2indentities();
     }
     &run_get_identity_halign_all($seqs, $obj, $type_bitcode & 2);
@@ -322,6 +322,7 @@ sub get_identity_halign {
             #$obj->{groups} = MCE::Shared->array({_DEEPLY_ => 1}, @$group_ori);
             $obj->{pair2indentities} = MCE::Shared->share({_DEEPLY_ => 1}, $pair2indentities_ori);
             $obj->{groups} = MCE::Shared->share({_DEEPLY_ => 1}, $group_ori);
+            $obj->{parallel} = 1;
             say STDERR "start MCE::Flow, count: " . scalar(@pairs);
             MCE::Flow->init(
                chunk_size => 1,
