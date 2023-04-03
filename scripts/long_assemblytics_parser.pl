@@ -136,10 +136,12 @@ sub bed2vcf_line {
         my $qry_strand = $4;
         my $qry_len = 1 + abs($qry_end - $qry_start);
         say STDERR "$qry_start, $qry_len, $svlen_ref";
-        my $ref_chrnow = $$ref_fasta{$F[0]} // die;
-        my $ref_seqnow = substr($ref_chrnow, $F[1]-1, $svlen_ref);
-        my $alt_chrnow = $$query_fasta{$qry_chr} // die "! $qry_chr ! $F[9] ! $line";
-        my $alt_seqnow = substr($alt_chrnow, $qry_start-1, $qry_len);
+        exists $$ref_fasta{$F[0]} // die;
+        exists $$query_fasta{$qry_chr} // die "! $qry_chr ! $F[9] ! $line";
+        my $ref_chrnow = \$$ref_fasta{$F[0]};
+        my $ref_seqnow = substr($$ref_chrnow, $F[1]-1, $svlen_ref);
+        my $alt_chrnow = \$$query_fasta{$qry_chr};
+        my $alt_seqnow = substr($$alt_chrnow, $qry_start-1, $qry_len);
         $newline[3] = $ref_seqnow;
         $newline[4] = $alt_seqnow;
         if($F[6] eq 'Deletion') {

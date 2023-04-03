@@ -405,7 +405,8 @@ sub get_ref_substr_seq {
     die unless defined $win_end;
     die unless defined $win_start;
     if ( exists $$REF_SEQS{$chr} ){
-        my $ref = substr($$REF_SEQS{$chr}, $win_start-1, $win_end - $win_start + 1);
+        my $ref_seq_now = \$$REF_SEQS{$chr};
+        my $ref = substr($$ref_seq_now, $win_start-1, $win_end - $win_start + 1);
         return $ref;
     } elsif ( $is_aug==0 and exists $$NONREF_SEQS{$chr} ) {
         my $dist_min=999999999;
@@ -476,6 +477,7 @@ sub rebuild_cons_seqs {
             }
             ## alt
             $alt_svs++;
+            # check mutation pos confict
             CHECKPOS:for(my $p=$sv_start; $p<=$sv_end; $p++) {
                 if (exists $sites_status{$p} and $sites_status{$p} == 1) {
                     my $id_now = $$vcf_header[$idi];
@@ -488,10 +490,11 @@ sub rebuild_cons_seqs {
                         my $ref_len_max = $p-$sv_start;
                         # deep copy
                         my $alts_ = [@$alts];
-                        $$alts_[ $$alles[0]-1 ] = substr($$alts_[ $$alles[0]-1 ], 0, $ref_len_max);
+                        my $ialt = $$alles[0]-1;
+                        $$alts_[ $ialt ] = substr($$alts_[ $ialt ], 0, $ref_len_max);
                         $ref_len = $ref_len_max;
                         $alts = $alts_;
-                        #die $$alts[ $$alles[0]-1 ];
+                        #die $$alts[ $ialt ];
                         last CHECKPOS;
                     } else { # skip_mut_at_same_pos == 0
                         # 有冲突位点就报错退出!

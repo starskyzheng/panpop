@@ -17,8 +17,8 @@ sub new {
     my $args = shift;
     my ($file, $max_len);
     $file = $$args{outfile} if defined $$args{outfile};
-    #$max_len = defined $$args{max_len} ? $$args{max_len} : 50000;
-    $max_len = $$args{max_len} if defined $$args{max_len};
+    $max_len = defined $$args{max_len} ? $$args{max_len} : 99999999999;
+    #$max_len = $$args{max_len} if defined $$args{max_len};
     my $supp_min = defined $$args{supp_min} ? $$args{supp_min} : 2;
     my $fh;
     $fh = zzIO::open_out_fh($file) if defined $file;
@@ -64,7 +64,7 @@ sub add_inv_bed {
     my $pos = $$line[1];
     my $infos = $$line[7];
     my $gt_info = $$line[9];
-    $gt_info=~m#^(\d)[/|](\d)# or return undef;
+    $gt_info=~m#^([\d]+)[/|]([\d]+)# or return undef;
     return undef if($1==0 and $2==0); # no mut
     my $gt = join("/", sort {$a <=> $b} ($1, $2));
     my $svlen = -1;
