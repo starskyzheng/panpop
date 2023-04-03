@@ -120,11 +120,11 @@ while ( <$I> ){
 
 my $lines_cpx;
 
-
+my $not_use_cpx = $type_bitcode & 2 ? 1 : 0; # 2 for fast and not use cpx; not_use_cpx==1 means force_cpx==1
 if ($threads==1) {
     $lines_cpx = zzarray->new();
     while(my $line = <$I>) {
-        my ($result, $is_cpx) = &prase_line($line);
+        my ($result, $is_cpx) = &prase_line($line, 1, $not_use_cpx);
         if ($is_cpx==1) {
             $lines_cpx->push($result);
         } else {
@@ -166,7 +166,7 @@ exit;
 
 sub flt_mce {
     my ( $mce, $chunk_ref, $chunk_id ) = @_;
-    my ($result, $is_cpx) = &prase_line($$chunk_ref[0], 1, 0);
+    my ($result, $is_cpx) = &prase_line($$chunk_ref[0], 1, $not_use_cpx);
     if ($is_cpx==1) {
         $lines_cpx->push($result);
         $mce->gather($chunk_id);
@@ -346,6 +346,7 @@ sub run_get_identity_halign_all {
     foreach my $id1 (0..$max_alts) {
         foreach my $id2 ($id1..$max_alts) {
             next if $id2<=$id1;
+            next if $obj->needs_run($id1, $id2, 1)==0; # no needs to run
             my ($identity, $diff, $gap) = &seq2identity([$$aln_alts[$id1], $$aln_alts[$id2]]);
             if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff)  {
                 #$seq2identity{"$id1:$id2"} = $identity;
@@ -386,6 +387,7 @@ sub seq2identity {
     tie my @s2, 'Tie::CharArray', $$seqs[1];
     my $len1 = scalar(@s1);
     my $len2 = scalar(@s2);
+    my $lendiff = abs($len1-$len2);
     if ($len1 != $len2) {
         confess "???? len not equal: $len1 $len2 @$seqs";
     }
@@ -394,6 +396,7 @@ sub seq2identity {
     my $lenr1 = 0;
     my $lenr2 = 0;
     my $gap = 0;
+    my $diff_now = 0;
     for(my $i=0; $i < $len1; $i++) {
         my $b1 = $s1[$i];
         my $b2 = $s2[$i];
@@ -401,17 +404,20 @@ sub seq2identity {
             $score++;
             $same++;
         } elsif ($b1 ne $b2 and ($b1 eq '-' or $b2 eq '-')) { # A/- or -/A
+            $diff_now++;
             $score -= 0.5;
-             $gap++;
+            $gap++;
         } elsif ($b1 eq '-' and $b2 eq '-') { # -/-
             # nothing
         } elsif ($b1 ne $b2 and ($b1 ne '-' and $b2 ne '-')) { # A/C
+            $diff_now++;
             # nothing
         } else {
             confess "???? $b1 $b2";
         }
         $lenr1++ if $b1 ne '-';
         $lenr2++ if $b2 ne '-';
+        return(0, $diff_now, $gap) if $diff_now > $mcl_group_threshold_diff;
     }
     #my $meanlenr = ($lenr1+$lenr2)/2;
     my $mexlenr = $lenr1 > $lenr2 ? $lenr1 : $lenr2; # max

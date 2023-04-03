@@ -9,7 +9,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use zzIO;
 
-my ($in, $out, $min_supporting, $samplename, $opt_help);
+my ($in, $out, $min_supporting, $samplename, $opt_help, $force_merge_insertion);
 
 $min_supporting = 2;
 
@@ -21,6 +21,7 @@ sub help {
     -i, --in <in.vcf>           input vcf file
     -o, --out <out.vcf>         output vcf file
     -m, --min_supporting <int>  min supporting samples, default $min_supporting
+    --force_merge_insertion     force merge insertion
     -s, --sample <str>          sample name
     -h, --help                  print this help message
 EOF
@@ -33,6 +34,7 @@ GetOptions (
         'help|h!' => \$opt_help,
         'i|in=s' => \$in,
         'o|out=s' => \$out,
+        'force_merge_insertion!' => \$force_merge_insertion,
         'm|min_supporting=s' => \$min_supporting,
         's|sample=s' => \$samplename,
 );
@@ -59,21 +61,35 @@ while(my $line = <$I>) { # vcf
         next;
     }
     my @F = split /\t/, $line;
+    $F[4] = [split(/,/, $F[4])];
     my ($chr, $pos, $svid, $ref, $alts) = @F[0,1,2,3,4];
     #next unless $pos == 4474552;
-    my ($max_alle, $new_gt, $supp) = &cal_alle_freq(\@F);
+    my $is_ins = $force_merge_insertion==1 ? &cal_is_ins(\@F) : 0;
+    my ($max_alle, $new_gt, $supp) = &cal_alle_freq(\@F, $is_ins);
     #say $O join "\t", $F[0], $F[1], $max_alle if defined $max_alle;
     say $O &rebuild_line(\@F, $max_alle, $new_gt, $supp) if defined $max_alle;
 }
 
 exit;
 
+sub cal_is_ins {
+    my ($F) = @_;
+    my $ref = $$F[3];
+    my $alts = $$F[4];
+    my $min_len = 5 * length($ref);
+    foreach my $alt (@$alts) {
+        if(length($alt) < $min_len) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 sub rebuild_line {
     my ($F, $alle, $new_gt, $supp) = @_;
     my @newline = $F->@[0..8];
     my $alts = $$F[4];
-    my @alts = split /,/, $alts;
-    my $newalt = $alts[$alle-1];
+    my $newalt = $$alts[$alle-1];
     $newline[4] = $newalt;
     if($newline[7] eq '.') {
         $newline[7] = "SUPP=$supp";
@@ -114,14 +130,16 @@ sub cal_max_alle {
 }
 
 sub cal_alle_freq {
-    my ($F) = @_;
+    my ($F, $is_ins) = @_;
     my %alle_freq;
     my %heteros;
+    my $not_missing = 0;
     foreach my $i (9..$#{$F}) {
         my $gt = $F->[$i];
         if($gt=~/^\./) {
             next;
         }
+        $not_missing++;
         $gt=~m#(\d+)/(\d+)# or die;
         my ($gt1, $gt2) = ($1, $2);
         if($gt1!=0 and $gt2!=0 and $gt1!=$gt2) { # 1/2
@@ -142,7 +160,16 @@ sub cal_alle_freq {
     }
     my $max_alle = &cal_max_alle(\%alle_freq, \%heteros);
     if(! defined $max_alle) {
-        return(undef);
+        if($is_ins==1) {
+            my $longest_allei = 1 + &get_longest_alle_i($F->[4]);
+            my $gt_now = '1/1';
+            if($alle_freq{$longest_allei}==1 and $heteros{$longest_allei}==1) {
+                $gt_now = '0/1';
+            }
+            return($longest_allei, $gt_now, $not_missing);
+        } else {
+            return(undef);
+        }
     }
     my $supp = $alle_freq{$max_alle};
     my $hetero_alle = $heteros{$max_alle} // 0;
@@ -153,7 +180,25 @@ sub cal_alle_freq {
     } else {
         $gt = '1/1';
     }
-    return($max_alle, $gt, $supp);
+    if($is_ins==1) {
+        return($max_alle, $gt, $not_missing);
+    } else {
+        return($max_alle, $gt, $supp);
+    }
+}
+
+sub get_longest_alle_i {
+    my ($alles) = @_;
+    my $max_len = 0;
+    my $max_i = 0;
+    foreach my $i (0..$#{$alles}) {
+        my $len = length($$alles[$i]);
+        if($len > $max_len) {
+            $max_len = $len;
+            $max_i = $i;
+        }
+    }
+    return $max_i;
 }
 
 
