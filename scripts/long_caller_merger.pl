@@ -133,15 +133,16 @@ sub cal_alle_freq {
     my ($F, $is_ins) = @_;
     my %alle_freq;
     my %heteros;
-    my $not_missing = 0;
+    my $not_missing_ref = 0;
     foreach my $i (9..$#{$F}) {
         my $gt = $F->[$i];
         if($gt=~/^\./) {
             next;
         }
-        $not_missing++;
+        
         $gt=~m#(\d+)/(\d+)# or die;
         my ($gt1, $gt2) = ($1, $2);
+        $not_missing_ref++ if $gt1!=0 or $gt2!=0;
         if($gt1!=0 and $gt2!=0 and $gt1!=$gt2) { # 1/2
             #die "Error: $gt";
             $alle_freq{$gt1} += 1;
@@ -160,13 +161,13 @@ sub cal_alle_freq {
     }
     my $max_alle = &cal_max_alle(\%alle_freq, \%heteros);
     if(! defined $max_alle) {
-        if($is_ins==1) {
+        if($is_ins==1 and $not_missing_ref >= $min_supporting) {
             my $longest_allei = 1 + &get_longest_alle_i($F->[4]);
             my $gt_now = '1/1';
-            if($alle_freq{$longest_allei}==1 and $heteros{$longest_allei}==1) {
+            if($alle_freq{$longest_allei}==1 and exists $heteros{$longest_allei} and $heteros{$longest_allei}==1) {
                 $gt_now = '0/1';
             }
-            return($longest_allei, $gt_now, $not_missing);
+            return($longest_allei, $gt_now, $not_missing_ref);
         } else {
             return(undef);
         }
@@ -181,7 +182,7 @@ sub cal_alle_freq {
         $gt = '1/1';
     }
     if($is_ins==1) {
-        return($max_alle, $gt, $not_missing);
+        return($max_alle, $gt, $min_supporting);
     } else {
         return($max_alle, $gt, $supp);
     }
