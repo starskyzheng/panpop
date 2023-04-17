@@ -81,7 +81,7 @@ print $O <<EOF;
 ##source=Assemblytics
 $vcfheader_chrlen
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of the SV.">
-##INFO=<ID=SVLEN,Number=1,Type=Float,Description="Length of the SV">
+##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length of the SV">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 EOF
 say $O join "\t", qw/#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT Assemblytics/;
@@ -118,17 +118,16 @@ sub bed2vcf_line {
     my ($line) = @_;
     chomp $line;
     my @F = split /\t/, $line;
-    my ($chr, $pos, $svid, $ref, $alts) = @F[0,1,2,3,4];
-    my $infos = $F[7];
+    my ($ref_chr, $ref_start, $ref_stop, $ID, $svlen) = @F[0,1,2,3,4];
+    my $sv_type = $F[6];
     my $dp;
     # #reference  ref_start  ref_stop  ID  size  strand   type  ref_gap_size  query_gap_size   query_coordinates  method
     #     0           1          2      3   4      5       6          7             8                 9             10
-    my $svlen = $F[4];
     return undef if $svlen > $max_len;
     #                #CHROM  POS  ID    REF     ALT   QUAL  FILTER  INFO  FORMAT sample
-    my @newline = ($F[0], $F[1], $F[3], 'REF', 'ALT' , '.', 'PASS', '.', 'GT', '1/1');
-    if( $F[6] eq 'Deletion' or $F[6] eq 'Insertion') {
-        my $svlen_ref = 1 + abs($F[2] - $F[1]);
+    my @newline = ($ref_chr, $ref_start, $ID, 'REF', 'ALT' , '.', 'PASS', '.', 'GT', '1/1');
+    if( $sv_type eq 'Deletion' or $sv_type eq 'Insertion') {
+        my $svlen_ref = 1 + abs($ref_stop - $ref_start);
         $F[9]=~/(^[^:]+):(\d+)-(\d+):([\-+])$/ or die;
         my $qry_chr = $1;
         my $qry_start = $2;
@@ -136,10 +135,11 @@ sub bed2vcf_line {
         my $qry_strand = $4;
         my $qry_len = 1 + abs($qry_end - $qry_start);
         say STDERR "$qry_start, $qry_len, $svlen_ref";
-        exists $$ref_fasta{$F[0]} // die;
-        exists $$query_fasta{$qry_chr} // die "! $qry_chr ! $F[9] ! $line";
-        my $ref_chrnow = \$$ref_fasta{$F[0]};
-        my $ref_seqnow = substr($$ref_chrnow, $F[1]-1, $svlen_ref);
+        exists $$ref_fasta{$ref_chr} // die "! Ref not exists $ref_chr ! $F[9] ! $line";
+        die if $$ref_fasta{$ref_chr} eq '';
+        exists $$query_fasta{$qry_chr} // die "! Ref not exists $qry_chr ! $F[9] ! $line";
+        my $ref_chrnow = \$$ref_fasta{$ref_chr};
+        my $ref_seqnow = substr($$ref_chrnow, $ref_start-1, $svlen_ref);
         my $alt_chrnow = \$$query_fasta{$qry_chr};
         my $alt_seqnow = substr($$alt_chrnow, $qry_start-1, $qry_len);
         $newline[3] = $ref_seqnow;
