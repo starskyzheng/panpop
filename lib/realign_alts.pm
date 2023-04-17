@@ -30,6 +30,7 @@ use List::Util qw/max min/;
 use Data::Dumper;
 use Carp qw/confess carp/; # carp=warn;confess=die
 use IPC::Open2;
+use Tie::CharArray;
 #use Clone qw(clone);
 use Storable qw(dclone);
 
@@ -69,6 +70,8 @@ my $align_level;
 my $ALN_PARAMS_max_tryi;
 my %ALN_PARAMS;
 my $init = 0;
+my $force_realign = 0;
+my $not_use_merge_alle_afterall = 0;
 
 sub init {
     return if $init == 1;
@@ -79,7 +82,8 @@ sub init {
     $tmp_dir = $main::tmp_dir // confess "tmp_dir not defined";
     $debug = $main::debug // confess "debug not defined";
     $align_level = $main::align_level // 1;
-
+    $force_realign = $main::force_realign // 0;
+    $not_use_merge_alle_afterall = $main::not_use_merge_alle_afterall // 0;
     foreach my $refs ([$HAlignC, 'stmsa'], 
                       [$muscle3, 'muscle3'],
                       [$mafft, 'mafft'],
@@ -112,7 +116,7 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{$force_aln_method}+1;
         $$lefti{$force_aln_method}--;
         return($force_aln_method, $tried);
-    } elsif ( $length<100 and exists $$lefti{muscle} and $$lefti{muscle}>0) {
+    } elsif ( $length<1000 and exists $$lefti{muscle} and $$lefti{muscle}>0) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
         $$lefti{muscle}--;
         return('muscle', $tried);
@@ -219,17 +223,17 @@ sub cal_alts_max_len {
 
 sub process_alts_aln_only {
     my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
-    my $t=$alt_max_length; #######
-    undef $alt_max_length;
+    #my $t=$alt_max_length; #######
+    #undef $alt_max_length;
     if($max_alts == -1) {
         $max_alts = scalar(@$alts)-1;
-    } elsif($max_alts==1) { # biallic, to skip calculation
+    } elsif($force_realign==0 and $max_alts==1) { # biallic, to skip calculation
         return({0=>$alts}, length($$alts[0]));
     } elsif (!defined $max_alts) {
         $max_alts = scalar(@$alts)-1;
         return({0=>$alts}, length($$alts[0])) if $max_alts==1;
     }
-    if(! defined $alt_max_length) {
+    if(! defined $alt_max_length or $alt_max_length<=0) {
         $alt_max_length = &cal_alts_max_len($alts);
     }
     my %lefti;
@@ -262,7 +266,7 @@ sub process_alts_aln_only {
 
 sub process_alts {
     my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
-    if($max_alts==1) { # biallic, to skip calculation
+    if($force_realign==0 and $max_alts==1) { # biallic, to skip calculation
         my %ret = (0=>$alts);
         return(\%ret, length($$alts[0]));
     }
@@ -334,10 +338,16 @@ sub alt_alts_to_muts {
                         (defined $last_nomiss_pos and $last_nomiss_pos==$i-$ref_missn) ) {
                         # already have a non-missing site at this pos
                         # cover and replase this site
-                        delete $muts{$miss_start};
+                        if($miss_start==0 and exists $muts{$miss_start}) {
+                            $old_sarray = delete $muts{$miss_start};
+                        } else {
+                            $old_sarray = &get_sarray(\@tie_seqs, $i-1, $max_alts, 0);
+                        }
                         say STDERR "delete mut $miss_start" if $debug;
-                        $old_sarray = &get_sarray(\@tie_seqs, $i-1, $max_alts, 0);
+                        #&append_sarray($sarray_old_del, $old_sarray);
+                        #die Dumper $alts;
                         &append_sarray($old_sarray, $sarray);
+                        #die Dumper $old_sarray;
                     } else {
                         $old_sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 0);
                     }
@@ -357,6 +367,7 @@ sub alt_alts_to_muts {
                 $is_ref_miss_at_start = 0;
                 $muts{0} = $old_sarray;
                 $old_sarray = []; $miss_start = -9;
+                #say STDERR "D1:" . Dumper \%muts;
             }
         } else {
             # not missing
@@ -393,7 +404,7 @@ sub alt_alts_to_muts {
         }
     }
     # say STDERR "!!muts: " . Dumper \%muts;
-    &merge_alle_afterall(\%muts, $$alts[0]); # 合并可以合并的兼容的位点
+    &merge_alle_afterall(\%muts, $$alts[0]) if $not_use_merge_alle_afterall==0; # 合并可以合并的兼容的位点
     #die Dumper $alts;
     return (\%muts, $aln_seqlen);
 }
@@ -615,6 +626,7 @@ sub append_sarray {
     unless (defined $max_alts) {
         $max_alts = scalar(@$append) - 1;
     }
+    if (ref($sarray) eq '') {confess()}
     if (! @$sarray) {
         for (my $i=0; $i<=$max_alts ; $i++) {
             my $app_seq = $$append[$i];
