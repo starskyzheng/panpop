@@ -30,13 +30,12 @@ use lib "$Bin/../lib";
 use Carp qw/confess carp/; # carp=warn;confess=die
 use zzIO;
 use Data::Dumper;
-use IPC::Open2;
-use Tie::CharArray;
+#use IPC::Open2;
 use MCE::Flow;
 use MCE::Candy;
 use Getopt::Long;
 use MCE::Channel;
-use File::Temp;
+#use File::Temp;
 use List::Util qw/max min/;
 
 use prase_vcf qw/read_ref read_vcf_header/;
@@ -56,6 +55,13 @@ my $print_all = 0;
 my $skip_mut_at_same_pos = 2;
 our $threads = 1; # default threads
 our $tmp_dir = $tmp_dir_def;
+my $first_merge = 0;
+my $chr_tolerance = 0;
+our $force_realign = 0;
+our $not_use_merge_alle_afterall = 0;
+my $mask_bed_file;
+my $mask_bed;
+my $skip_snp = 0;
 
 sub usage {
     my $msg = shift;
@@ -69,11 +75,14 @@ options:
     -t | --threads <int>           Number of threads (default: $threads)
     -E | --ext_bp_max <int>        Max extension bp (default: $ext_bp_max)
     -e | --ext_bp_min <int>        Min extension bp (default: $ext_bp_min)
+    --mask_bed_file <file>         Mask bed file
     --tmpdir <dir>                 Temprory directory (default: $tmp_dir)
+    --chr_tolerance                Tolerance of chr name (default: $chr_tolerance)
     -h | --help                    Print this help
-    --verb <bool>
+    --verb <int>
     --all <bool>                   Print lines even no mutation.
     --level <BITCODE>              Level &2 will not merge lines. Level &4 will split missing alles.
+    --skip_snp <bool>              Skip snp
 EOF
     exit(1);
 }
@@ -85,7 +94,7 @@ GetOptions (
         'i|in_vcf=s' => \$infile,
         'o|out_vcf=s' => \$outfile,
         'debug!' => \$debug,
-        'verb!' => \$verb,
+        'verb=i' => \$verb,
         't|threads=i' => \$threads,
         'r|ref_fasta_file=s' => \$ref_fasta_file,
         'aug!' => \$is_aug,
@@ -95,6 +104,12 @@ GetOptions (
         'all!' => \$print_all,
         'level=i' => \$align_level,
         'skip_mut_at_same_pos=i' => \$skip_mut_at_same_pos,
+        'first_merge!' => \$first_merge,
+        'chr_tolerance!' => \$chr_tolerance,
+        'force_realign!' => \$force_realign,
+        'not_use_merge_alle_afterall!' => \$not_use_merge_alle_afterall,
+        'mask_bed_file=s' => \$mask_bed_file,
+        'skip_snp!' => \$skip_snp,
 );
 
 
@@ -107,6 +122,7 @@ if (! -e $tmp_dir) {
 
 our $config = read_config_yaml("$Bin/../config.yaml");
 realign_alts::init();
+$mask_bed = read_mask_bed_file($mask_bed_file) if $mask_bed_file;
 
 my $I_VCF = open_in_fh($infile);
 my $O_VCF = open_out_fh($outfile);
@@ -186,8 +202,9 @@ sub cal_max_ext_range {
     if ($max_len <= 1) { # snp
         $ext = 1;
     } else { # sv/indel
-        $ext = int($max_len * 0.2)+1;
+        $ext = int($max_len * 0.3)+1;
     }
+
     if ($ext > $ext_bp_max) {
         $ext = $ext_bp_max;
     } elsif ($ext < $ext_bp_min) {
@@ -234,6 +251,36 @@ sub mce_run {
     }
 }
 
+sub check_is_in_mask {
+    my ($chr, $pos, $len) = @_;
+    #die Dumper $mask_bed;
+    #say STDERR "$chr $pos $len";
+    return 1 if ! defined $mask_bed_file; # not enable mask
+    return 0 if ! exists $mask_bed->{$chr};
+    my $end = $pos + $len - 1;
+    my $arrays = $mask_bed->{$chr};
+    my $array_n = scalar(@$arrays);
+    my @windows_in;
+    foreach my $arrayi (0..$array_n-1) {
+        my $array = $arrays->[$arrayi];
+        my ($mask_start, $mask_end) = @$array;
+        if ($mask_end < $pos) {
+            next;
+        } elsif ($pos < $mask_end && $end > $mask_start) {
+            #return $arrayi;
+            push @windows_in, $arrayi;
+        } elsif ($mask_start > $end) {
+            last;
+        }
+    }
+    if (@windows_in) {
+        my $min_windowsid = min(@windows_in);
+        return $min_windowsid;
+    } else {
+        return 0;
+    }
+}
+
 sub zz_mce_producer {
     my $I = $I_VCF;
     my @lines;
@@ -253,26 +300,38 @@ sub zz_mce_producer {
         my $chr = $F[0];
         my $pos = $F[1];
         my $ref_seq = $F[3];
+        my $reflen = length($ref_seq);
         my @alts = split(/,/, $F[4]);
         $F[4] = \@alts;
+        if ($skip_snp==1) {
+            my $alt_len_max = max(map {length($_)} @alts);
+            my $is_snp = $reflen == 1 && $alt_len_max == 1;
+            next if $is_snp==1; ##### skip snp
+        }
         if ($align_level & 2) { # align_level==2, not merge lines
-            $end_real = $pos + length($ref_seq) - 1;
+            $end_real = $pos + $reflen - 1;
             $queue->enqueue( $iline, [[\@F], $chr, $pos, $end_real]);
             $iline++;
             next;
         }
         # next if $pos < 14999102; ######### debug
-        unless (defined $chr_old) { # init
+        unless (defined $chr_old) { # init or new chr
             $chr_old = $chr;
             $min_start = $pos;
             ($max_end, $end_real) = &cal_max_ext_range($ref_seq, \@alts, $pos, -1);
             redo;
         }
-        if ($chr_old ne $chr or $max_end+1 < $pos) {
+        if ($chr_old ne $chr or $max_end+1 < $pos) { # new chr or not overlap, treated as new chunk
             #print(STDERR "2!! $chr_old\t$min_start\t$max_end\t$pos\n");
             die unless defined $min_start;
             die unless defined $end_real;
-            $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] ) ;
+            my $lines_count = scalar @lines;
+            #say STDERR "enqueue: $chr_old:$min_start-$end_real ($lines_count lines)";
+            if(defined $mask_bed_file) {
+                &split_queue_by_mask_bed(\@lines, \$iline);
+            } else {
+                $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] ) if @lines;
+            }
             @lines=();
             if ($chr_old ne $chr) {
                 $chr_old = undef;
@@ -280,20 +339,64 @@ sub zz_mce_producer {
                 $max_end = undef;
                 $end_real = undef;
             } else {
+                $min_start = $pos;
                 $max_end = $pos;
                 $end_real = $pos;
-                $min_start = $pos;
             }
             redo;
         }
         $min_start //= $pos;
-        ($max_end, $end_real) = &cal_max_ext_range($ref_seq, \@alts, $pos, $max_end);
+        my ($max_end_now, $end_real_now) = &cal_max_ext_range($ref_seq, \@alts, $pos, $max_end);
+        $end_real = $end_real_now if((!defined $end_real) or $end_real < $end_real_now);
+        $max_end = $max_end_now if((!defined $max_end) or $max_end < $max_end_now);
+        #say STDERR "$pos: $end_real $max_end";
         push @lines, \@F;
         $iline++;
     }
     close $I;
-    $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] )  if @lines;
+    if(defined $mask_bed_file) {
+        &split_queue_by_mask_bed(\@lines, \$iline);
+    } else {
+        $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] ) if @lines;
+    }
     $queue->end();
+}
+
+sub split_queue_by_mask_bed {
+    my ($lines, $iline_) = @_;
+    my %windowi2lines;
+    foreach my $line (@$lines) {
+        my @F = @$line;
+        my $chr = $F[0];
+        my $pos = $F[1];
+        my $reflen = length($F[3]);
+        my $window_id = &check_is_in_mask($chr, $pos, $reflen);
+        if($window_id==0) {
+            my $end_real = $pos + $reflen - 1;
+            $queue->enqueue( $$iline_, [[$line], $chr, $pos, $end_real] );
+            $$iline_++;
+        } else {
+            push $windowi2lines{$window_id}->@*, $line;
+        }
+    }
+    #die Dumper \%windowi2lines;
+    foreach my $window_id (keys %windowi2lines) {
+        my $lines = $windowi2lines{$window_id};
+        my $line0 = $lines->[0];
+        my $chr = $$line0[0];
+        my $pos = $$line0[1];
+        my $end_real = $pos;
+        foreach my $line (@$lines) {
+            my $chr = $$line[0];
+            my $pos = $$line[1];
+            my $ref_seq = $$line[3];
+            my $reflen = length($ref_seq);
+            my $end_real_now = $pos + $reflen - 1;
+            $end_real = $end_real_now if $end_real < $end_real_now;
+        }
+        $queue->enqueue( $$iline_, [$lines, $chr, $pos, $end_real] );
+        $$iline_++;
+    }
 }
 
 
@@ -345,9 +448,8 @@ sub process_line_new {
         $alt_max_length = $len if $alt_max_length < $len;
         $alt_min_length = $len if $alt_min_length > $len;
     }
-    if ($is_snp==1 or scalar(@$ref_alts)==2) { ########## SNP #  or $alt_min_length<=1
-        my $retline = &gen_lines_before_process($ids2alles, $ref_alts, 
-                                                    $chr, $win_start);
+    if ($force_realign==0 and($is_snp==1 or scalar(@$ref_alts)==2)) { ########## SNP #  or $alt_min_length<=1
+        my $retline = &gen_lines_before_process($ids2alles, $ref_alts, $chr, $win_start);
         if ($retline) {
             return([$retline])
         } else {return undef}
@@ -447,11 +549,14 @@ sub rebuild_cons_seqs {
     my %new_ids2alles;
     say STDERR "Now start rebuild_cons_seqs" if $debug;
     rebuild_cons_seqs_IDI:for (my $idi = 9; $idi <= $idi_max; $idi++) {
-        my %sites_status; # -1:miss   0:ref    1:alt
+        #my %sites_status1; # -1:miss   0:ref    1:alt
+        #my %sites_status2; # -1:miss   0:ref    1:alt
+        my %sites_status; # -1:miss   0:ref    1:alt_hetero  2:alt_hetero(changed_phase)  8:alt_homo  9:alt_already_overlaped
         my $a1 = $ref;
         my $a2 = $ref;
         my $last_start = 99999999999999;
         my $alt_svs=0;
+        my @old_stat = (); # phase_status, mut_is_ref_mut_hetero, is_first
         ILINE:for(my $iline=$iline_max; $iline>=0; $iline--) { # from last to first
             my $line = $$lines[$iline];
             my $alts = $$line[4];
@@ -460,59 +565,129 @@ sub rebuild_cons_seqs {
             $last_start = $sv_start;
             my $ref_len = length($$line[3]);
             my $sv_end = $sv_start + $ref_len-1;
-
             my $alles = $$lines[$iline][$idi];
             if (!defined $alles) { # miss
                 for(my $p=$sv_start; $p<=$sv_end; $p++) {
                     $sites_status{$p} = -1 if ( !exists $sites_status{$p} );
                 }
-                next;
+                next; # skip this position for this sample
             } elsif ($$alles[0]==0 and $$alles[1]==0) { # ref
                 for(my $p=$sv_start; $p<=$sv_end; $p++) {
                     if ( (!exists $sites_status{$p}) or $sites_status{$p} == -1 ) {
                         $sites_status{$p} = 0;
                     }
                 }
-                next;
+                next ILINE; # no mutation in this sample, skip this position for this sample
+            }
+
+            my $phase_status = -1; # 1 for 0/x; 2 for x/0; -1 for other
+            my $mut_is_ref_mut_hetero = 0; 
+            if($$alles[0] != $$alles[1] and ($$alles[0]==0 or $$alles[1]==0)) {
+                $mut_is_ref_mut_hetero = 1;
+                if($$alles[0]==0) {
+                    $phase_status = 1;
+                } else {
+                    $phase_status = 2;
+                }
+            }
+            if(!@old_stat) { # INIT
+                @old_stat = ($phase_status, $mut_is_ref_mut_hetero, 1);
             }
             ## alt
             $alt_svs++;
             # check mutation pos confict
+            my $confict_status = undef; # undef:unknown  -1:confict  
+                                        # 1:no_confict_until_now(no change phase)  
+                                        # 2:no_confict_until_now(changed phase)  
+                                        # 0:no_confict_all
             CHECKPOS:for(my $p=$sv_start; $p<=$sv_end; $p++) {
-                if (exists $sites_status{$p} and $sites_status{$p} == 1) {
+                if (exists $sites_status{$p} and $sites_status{$p} >= 1) {
                     my $id_now = $$vcf_header[$idi];
-                    say STDERR "Warn: Mutation overlaped! chr:$chr, wins:$win_start, wine:$win_end pos:$p id:$id_now";
+                    say STDERR "Warn: Mutation overlaped! chr:$chr, wins:$win_start, wine:$win_end pos:$p id:$id_now" if $verb>=2;
                     if($skip_mut_at_same_pos == 1) {
                         # 只要有一个位点有问题，就跳过这个个体的这一行
                         next ILINE;
                     } elsif($skip_mut_at_same_pos == 2) {
+                        # TODO: 根据杂合与否，判断自动修复/反转Allele并redo
                         # 跳过冲突的位点 (自动修复)
-                        my $ref_len_max = $p-$sv_start;
-                        # deep copy
-                        my $alts_ = [@$alts];
-                        my $ialt = $$alles[0]-1;
-                        $$alts_[ $ialt ] = substr($$alts_[ $ialt ], 0, $ref_len_max);
-                        $ref_len = $ref_len_max;
-                        $alts = $alts_;
-                        #die $$alts[ $ialt ];
-                        last CHECKPOS;
+                        if($mut_is_ref_mut_hetero==1) {
+                            if((!defined $confict_status) and exists $sites_status{$p} )  { # init
+                                my $sites_status_now = $sites_status{$p};
+                                unless($sites_status_now == 1 or $sites_status_now == 2) {
+                                    goto FIX_ALTS;
+                                }
+                                $confict_status //= $sites_status_now;
+                                die if $confict_status == -1; # should not happen
+                            }
+                            CHECKPOS2:foreach my $p2($p..$sv_end) {
+                                if(exists $sites_status{$p2}) {
+                                    my $sites_status_now = $sites_status{$p2};
+                                    if($sites_status_now != -1 and $sites_status_now != $confict_status) {
+                                        $confict_status = -1;
+                                        last CHECKPOS2;
+                                    }
+                                } else {
+                                    $confict_status = 0;
+                                }
+                            }
+                            $confict_status=0 if $confict_status>=1;
+                            if($confict_status==0) { # change phase
+                                say STDERR "change phase at $p" if $verb>=2;
+                                ($$alles[0], $$alles[1]) = ($$alles[1], $$alles[0]);
+                                $phase_status = 3-$phase_status; # 1->2, 2->1
+                                last CHECKPOS;
+                            } else {
+                                goto FIX_ALTS;
+                            }
+                        } else {
+                            FIX_ALTS:
+                            say STDERR "Fixing alts at $p" if $verb>=1;
+                            my $ref_len_max = $p-$sv_start;
+                            # deep copy
+                            my $alts_ = [@$alts];
+                            my $ialt = $$alles[0]-1;
+                            $$alts_[ $ialt ] = substr($$alts_[ $ialt ], 0, $ref_len_max);
+                            $ref_len = $ref_len_max;
+                            $alts = $alts_;
+                            #die $$alts[ $ialt ];
+                            last CHECKPOS;
+                        }
                     } else { # skip_mut_at_same_pos == 0
                         # 有冲突位点就报错退出!
                         say STDERR "$ref ;\n$a1 ; \n$a2 $id_now";
                         die "DIE! chr:$chr, wins:$win_start, wine:$win_end, pos:$p, idi:$idi, sv_start:$sv_start, sv_end:$sv_end line:$iline, ref_len:$ref_len, alles:$$alles[0], $$alles[1]";
                     }
-                    
                 } else {
-                    $sites_status{$p}=1;
+                    if($mut_is_ref_mut_hetero==1) {
+                        $sites_status{$p} = $phase_status; # mut_is_ref_mut_hetero
+                    } else {
+                        $sites_status{$p} = 8; # homo with mut
+                    }
                 }
             }
+            if($first_merge==1 and $old_stat[2]!=1) { # not first SV in window, 隔行changed_phase
+                if($old_stat[1] == 1 and $mut_is_ref_mut_hetero == 1) { # mut_is_ref_mut_hetero for both this site and old site
+                    if($old_stat[0] == $phase_status) { # both 0/x or both x/0
+                        # change phase
+                        say STDERR "change phase for $sv_start" if $verb>=2;
+                        ($$alles[0], $$alles[1]) = ($$alles[1], $$alles[0]);
+                        #say STDERR "$$alles[0], $$alles[1]";
+                        $phase_status = 3-$phase_status; # 1->2, 2->1
+                        for(my $p=$sv_start; $p<=$sv_end; $p++) {
+                            $sites_status{$p} = $phase_status;
+                        }
+                    }
+                }
+            }
+            @old_stat = ($phase_status, $mut_is_ref_mut_hetero, 0);
             if ($$alles[0] != 0) {
                 my $alt = $$alts[ $$alles[0]-1 ];
-                say STDERR "$a1, $chr : $sv_start, $win_start~$win_end, $ref_len, $alt" if $debug;
+                say STDERR "a1:($idi) $a1, $chr : $sv_start, $win_start~$win_end, $sv_start-$win_start, $ref_len, $alt" if $debug;
                 substr($a1, $sv_start-$win_start, $ref_len, $alt);
             }
             if ($$alles[1] != 0) {
                 my $alt = $$alts[ $$alles[1]-1 ];
+                say STDERR "a2:($idi) $a2, $chr : $sv_start, $win_start~$win_end, $sv_start-$win_start, $ref_len, $alt" if $debug;
                 substr($a2, $sv_start-$win_start, $ref_len, $alt);
             }
         }
@@ -595,7 +770,6 @@ sub gen_lines {
             }
             push @line, "$new_gts[0]/$new_gts[1]";# . "$oldline_ori[$i]";
         }
-        say STDERR "@line" if $debug;
         push @new_lines, [@line];
     }
     return(\@new_lines);
@@ -644,7 +818,7 @@ sub read_ref_noaug {
         next unless $_;
         if (/^>(\S+)(\s|$)/) {
             my $chr_raw = $1;
-            if ($chr_raw=~/^\d+$/) {
+            if ($chr_tolerance==1 or $chr_raw=~/^\d+$/) {
                 $seq_now = \$ref{$chr_raw};
             } elsif ($chr_raw=~/^([\w_]+)\[(\d+)\]$/) {  # zzperl vg2gfa2fa
                 #$chr_raw=~/^(\S+)_(\d+)_\d+(\s|$)/ or die; # gfatools gfa2fa
@@ -652,7 +826,7 @@ sub read_ref_noaug {
                 my $pos = $2;
                 $seq_now = \$nonref{$chr}{$pos};
             } else {
-                die "Error: Chr name error, must be numeric only: $in : $chr_raw"
+                die "Error: Chr name error! without --chr_tolerance, Chr must be numeric only: $in : $chr_raw";
             }
             $$seq_now = '';
             next;
@@ -666,4 +840,25 @@ sub read_ref_noaug {
     return (\%ref, $stat, \%nonref);
 }
 
-
+sub read_mask_bed_file {
+    my ($in) = @_;
+    say STDERR "Reading mask file: $in";
+    my %mask;
+    my $I = open_in_fh($in);
+    while(<$I>){
+        chomp;
+        next unless $_;
+        my ($chr, $start, $end) = split /\t/;
+        $mask{$chr}{$start+1} = $end;
+    }
+    my %mask2;
+    foreach my $chr (keys %mask) {
+        my @array;
+        foreach my $start (sort {$a <=> $b} keys %{$mask{$chr}}) {
+            my $end = $mask{$chr}{$start};
+            push @array, [$start, $end];
+        }
+        $mask2{$chr} = \@array;
+    }
+    return(\%mask2);
+}
