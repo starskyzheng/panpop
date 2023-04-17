@@ -45,7 +45,7 @@ use Tie::CharArray;
 
 use realign_alts qw/aln_halign process_alts_aln_only/;
 use read_config qw/read_config_yaml/;
-use Identity;
+use Identity qw/seq2identity/;
 
 our $config = read_config_yaml("$Bin/../config.yaml");
 
@@ -344,7 +344,7 @@ sub run_get_identity_halign_all {
         foreach my $id2 ($id1..$max_alts) {
             next if $id2<=$id1;
             next if $obj->needs_run($id1, $id2, 1)==0; # no needs to run
-            my ($identity, $diff, $gap) = &seq2identity([$$aln_alts[$id1], $$aln_alts[$id2]]);
+            my ($identity, $diff, $gap) = $obj->seq2identity([$$aln_alts[$id1], $$aln_alts[$id2]]);
             say STDERR "get_identity_halign : $id1 $id2 $identity $diff $gap" if $verb;
             if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff)  {
                 #$seq2identity{"$id1:$id2"} = $identity;
@@ -369,7 +369,7 @@ sub run_get_identity_halign_pair {
     my $lendiff = abs($len1-$len2);
     #my ($aln_exit_status, $aln_seqs) = aln_halign('HAlignC', [$seq1, $seq2], 1);
     my ($aln_seqs) = process_alts_aln_only([$seq1, $seq2], -1, -1);
-    my ($identity, $diff, $gap) = &seq2identity($aln_seqs);
+    my ($identity, $diff, $gap) = $obj->seq2identity($aln_seqs);
     #say STDERR "$identity";
     if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff) {
         $mutex->lock() if $mutex;
@@ -378,54 +378,6 @@ sub run_get_identity_halign_pair {
     }
     return;
 }
-
-sub seq2identity {
-    my ($seqs) = @_;
-    tie my @s1, 'Tie::CharArray', $$seqs[0];
-    tie my @s2, 'Tie::CharArray', $$seqs[1];
-    my $len1 = scalar(@s1);
-    my $len2 = scalar(@s2);
-    my $lendiff = abs($len1-$len2);
-    if ($len1 != $len2) {
-        confess "???? len not equal: $len1 $len2 @$seqs";
-    }
-    my $same=0;
-    my $score = 0;
-    my $lenr1 = 0;
-    my $lenr2 = 0;
-    my $gap = 0;
-    my $diff_now = 0;
-    for(my $i=0; $i < $len1; $i++) {
-        my $b1 = $s1[$i];
-        my $b2 = $s2[$i];
-        if ($b1 eq $b2 and $b1 ne '-') { # A/A
-            $score++;
-            $same++;
-        } elsif ($b1 ne $b2 and ($b1 eq '-' or $b2 eq '-')) { # A/- or -/A
-            $diff_now++;
-            $score -= 0.5;
-            $gap++;
-        } elsif ($b1 eq '-' and $b2 eq '-') { # -/-
-            # nothing
-        } elsif ($b1 ne $b2 and ($b1 ne '-' and $b2 ne '-')) { # A/C
-            $diff_now++;
-            # nothing
-        } else {
-            confess "???? $b1 $b2";
-        }
-        $lenr1++ if $b1 ne '-';
-        $lenr2++ if $b2 ne '-';
-        return(0, $diff_now, $gap) if $diff_now > $mcl_group_threshold_diff;
-    }
-    #my $meanlenr = ($lenr1+$lenr2)/2;
-    my $mexlenr = $lenr1 > $lenr2 ? $lenr1 : $lenr2; # max
-    my $diff = $mexlenr - $same;
-    my $identity = $same/$mexlenr;
-    return($identity, $diff, $gap);
-}
-
-
-
 
 
 {
