@@ -17,6 +17,28 @@ use Carp;
 
 use zzIO;
 
+require Exporter;
+use vars qw(
+  @ISA
+  %EXPORT_TAGS
+  @EXPORT_OK
+  @EXPORT
+);
+
+@ISA = qw(Exporter);
+
+%EXPORT_TAGS = (
+    'all' => [
+        qw(
+            seq2identity
+        )
+    ]
+);
+
+@EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+@EXPORT    = qw(seq2identity);
+
+
 our $use_mcl = 1;
 if($use_mcl==1) {
     #use Algorithm::MCL;
@@ -33,7 +55,7 @@ sub new {
         groups => [],
         pair2indentities => {},
         parallel => 0,
-        mcl_group_threshold_diff => $args{mcl_group_threshold_diff} // 20,
+        mcl_group_threshold_diff => $args{mcl_group_threshold_diff} // 20, # max gap
         mcl_group_threshold_identity => $args{mcl_group_threshold_identity} // 0.8,
         seqs => $args{seqs} // undef,
         lock => undef,# => MCE::Mutex->new,
@@ -317,6 +339,54 @@ sub get_final_groups_mcl_run {
     $self->{groups} = \@groups;
     #die;
     return \@groups;
+}
+
+
+
+sub seq2identity {
+    my ($self, $seqs) = @_;
+    tie my @s1, 'Tie::CharArray', $$seqs[0];
+    tie my @s2, 'Tie::CharArray', $$seqs[1];
+    my $len1 = scalar(@s1);
+    my $len2 = scalar(@s2);
+    my $lendiff = abs($len1-$len2);
+    if ($len1 != $len2) {
+        confess "???? len not equal: $len1 $len2 @$seqs";
+    }
+    my $same=0;
+    my $score = 0;
+    my $lenr1 = 0;
+    my $lenr2 = 0;
+    my $gap = 0;
+    my $diff_now = 0;
+    for(my $i=0; $i < $len1; $i++) {
+        my $b1 = $s1[$i];
+        my $b2 = $s2[$i];
+        if ($b1 eq $b2 and $b1 ne '-') { # A/A
+            $score++;
+            $same++;
+        } elsif ($b1 ne $b2 and ($b1 eq '-' or $b2 eq '-')) { # A/- or -/A
+            $diff_now++;
+            $score -= 0.5;
+            $gap++;
+        } elsif ($b1 eq '-' and $b2 eq '-') { # -/-
+            # nothing
+        } elsif ($b1 ne $b2 and ($b1 ne '-' and $b2 ne '-')) { # A/C
+            $diff_now++;
+            # nothing
+        } else {
+            confess "???? $b1 $b2";
+        }
+        $lenr1++ if $b1 ne '-';
+        $lenr2++ if $b2 ne '-';
+        #return(0, $diff_now, $gap) if $diff_now > $self->{mcl_group_threshold_diff};
+        return(0, $diff_now, $gap) if $gap > $self->{mcl_group_threshold_diff};
+    }
+    #my $meanlenr = ($lenr1+$lenr2)/2;
+    my $mexlenr = $lenr1 > $lenr2 ? $lenr1 : $lenr2; # max
+    my $diff = $mexlenr - $same;
+    my $identity = $same/$mexlenr;
+    return($identity, $diff, $gap);
 }
 
 
