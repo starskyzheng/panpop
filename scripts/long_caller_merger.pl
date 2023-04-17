@@ -9,19 +9,24 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use zzIO;
 
-my ($in, $out, $min_supporting, $samplename, $opt_help, $force_merge_insertion);
+my ($in, $out, $min_supporting, $samplename, $opt_help);
 
 $min_supporting = 2;
+my $force_merge_insertion = 0;
+my $force_merge_deletion = 0;
+my $force_merge_fold = 5;
 
 sub help {
     my ($info) = @_;
     say STDERR $info if $info;
     say <<EOF;
-    perl $0 -i <in.vcf> -o <out.vcf> -s <sample_name>
+usage: perl $0 -i <in.vcf> -o <out.vcf> -s <sample_name>
     -i, --in <in.vcf>           input vcf file
     -o, --out <out.vcf>         output vcf file
     -m, --min_supporting <int>  min supporting samples, default $min_supporting
     --force_merge_insertion     force merge insertion
+    --force_merge_deletion      force merge deletion
+    --force_merge_fold <int>    force merge fold for insertion or deletion, default $force_merge_fold
     -s, --sample <str>          sample name
     -h, --help                  print this help message
 EOF
@@ -35,10 +40,13 @@ GetOptions (
         'i|in=s' => \$in,
         'o|out=s' => \$out,
         'force_merge_insertion!' => \$force_merge_insertion,
+        'force_merge_deletion!' => \$force_merge_deletion,
+        'force_merge_fold=i' => \$force_merge_fold,
         'm|min_supporting=s' => \$min_supporting,
         's|sample=s' => \$samplename,
 );
 
+&help("force_merge_fold < 1: $force_merge_fold") if $force_merge_fold < 1;
 &help() if $opt_help;
 &help() unless defined $in;
 &help() unless defined $out;
@@ -65,18 +73,33 @@ while(my $line = <$I>) { # vcf
     my ($chr, $pos, $svid, $ref, $alts) = @F[0,1,2,3,4];
     #next unless $pos == 4474552;
     my $is_ins = $force_merge_insertion==1 ? &cal_is_ins(\@F) : 0;
-    my ($max_alle, $new_gt, $supp) = &cal_alle_freq(\@F, $is_ins);
+    my $is_del = $force_merge_deletion==1 ? &cal_is_del(\@F) : 0;
+    my ($max_alle, $new_gt, $supp) = &cal_alle_freq(\@F, $is_ins, $is_del);
     #say $O join "\t", $F[0], $F[1], $max_alle if defined $max_alle;
     say $O &rebuild_line(\@F, $max_alle, $new_gt, $supp) if defined $max_alle;
 }
 
 exit;
 
+sub cal_is_del {
+    my ($F) = @_;
+    my $ref = $$F[3];
+    my $alts = $$F[4];
+    my $min_len = length($ref)/$force_merge_fold;
+    $min_len = 1 if $min_len < 1;
+    foreach my $alt (@$alts) {
+        if(length($alt) > $min_len) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 sub cal_is_ins {
     my ($F) = @_;
     my $ref = $$F[3];
     my $alts = $$F[4];
-    my $min_len = 5 * length($ref);
+    my $min_len = $force_merge_fold * length($ref);
     foreach my $alt (@$alts) {
         if(length($alt) < $min_len) {
             return 0;
@@ -130,7 +153,8 @@ sub cal_max_alle {
 }
 
 sub cal_alle_freq {
-    my ($F, $is_ins) = @_;
+    my ($F, $is_ins, $is_del) = @_;
+    my $is_force = $is_ins || $is_del;
     my %alle_freq;
     my %heteros;
     my $not_missing_ref = 0;
@@ -161,8 +185,15 @@ sub cal_alle_freq {
     }
     my $max_alle = &cal_max_alle(\%alle_freq, \%heteros);
     if(! defined $max_alle) {
-        if($is_ins==1 and $not_missing_ref >= $min_supporting) {
-            my $longest_allei = 1 + &get_longest_alle_i($F->[4]);
+        if($is_force==1 and $not_missing_ref >= $min_supporting) {
+            my $longest_allei;
+            if($is_ins==1) {
+                $longest_allei = 1 + &get_longest_alle_i($F->[4]);
+            } elsif ($is_del==1) {
+                $longest_allei = 1 + &get_shortest_alle_i($F->[3]);
+            } else {
+                die;
+            }
             my $gt_now = '1/1';
             if($alle_freq{$longest_allei}==1 and exists $heteros{$longest_allei} and $heteros{$longest_allei}==1) {
                 $gt_now = '0/1';
@@ -181,7 +212,7 @@ sub cal_alle_freq {
     } else {
         $gt = '1/1';
     }
-    if($is_ins==1) {
+    if($is_force==1) {
         return($max_alle, $gt, $min_supporting);
     } else {
         return($max_alle, $gt, $supp);
@@ -200,6 +231,20 @@ sub get_longest_alle_i {
         }
     }
     return $max_i;
+}
+
+sub get_shortest_alle_i {
+    my ($alles) = @_;
+    my $min_len = 100000000;
+    my $min_i = 0;
+    foreach my $i (0..$#{$alles}) {
+        my $len = length($$alles[$i]);
+        if($len < $min_len) {
+            $min_len = $len;
+            $min_i = $i;
+        }
+    }
+    return $min_i;
 }
 
 
