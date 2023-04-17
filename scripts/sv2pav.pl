@@ -34,6 +34,8 @@ use Getopt::Long;
 use List::Util qw/max min/;
 use MCE::Flow;
 use MCE::Candy;
+use Tie::CharArray;
+
 
 my ($in, $out, $opt_help);# = @ARGV;
 my $thread = 1;
@@ -41,21 +43,27 @@ my $sv_min_dp = 10;
 my $max_len_tomerge = 5;
 my $debug = 0;
 my $min_diff_fold = 5;
+my $enable_norm_alle = 1;
+$out = '-';
 
 sub usage {
     print <<EOF;
 Usage: $0 [options]
 Options:
-    -i | --invcf	    input vcf file
-    -o | --outvcf	    output file, default: -
-    -t | --threads  	thread number, default: $thread
-    --sv_min_dp         sv_min_dp, default: $sv_min_dp
-    --max_len_tomerge   max_len_tomerge, default: $max_len_tomerge
-    --min_diff_fold     min different length (fold) to merge, default: $min_diff_fold
+    -i | --invcf       <FILE> input vcf file
+    -o | --outvcf      <FILE> output file, default: $out
+    -t | --threads     <INT>  thread number, default: $thread
+    --sv_min_dp        <INT>  sv_min_dp, default: $sv_min_dp
+    --max_len_tomerge  <INT>  max_len_tomerge, 0 for +∞, default: $max_len_tomerge
+    --min_diff_fold    <INT>  min different length (fold) to merge, default: $min_diff_fold
+    --enable_norm_alle <INT>  enable normalize alleles, default: $enable_norm_alle
 EOF
     exit;
 }
+
 $min_diff_fold = 1 if $min_diff_fold < 1;
+
+my $ARGVs = join " ", @ARGV;
 
 GetOptions (
     'help|h!' => \$opt_help,
@@ -63,15 +71,28 @@ GetOptions (
     'o|outvcf=s' => \$out,
     't|threads=i' => \$thread,
     'max_len_tomerge=i' => \$max_len_tomerge,
+    'min_diff_fold=i' => \$min_diff_fold,
     'sv_min_dp=i' => \$sv_min_dp,
+    'enable_norm_alle=i' => \$enable_norm_alle,
     'debug!' => \$debug,
 );
 
+$max_len_tomerge = 999999999 if $max_len_tomerge <= 0;
 &usage() if $opt_help or not $in or not $out;
 
 my $I = open_in_fh($in);
 my $O = open_out_fh($out, 8);
 
+while(<$I>) {
+    if(/^##/) {
+        print $O $_;
+        next;
+    } elsif (/^#/) {
+        say $O qq(##CommandLine="$0 $ARGVs");
+        print $O $_;
+        last;
+    }
+}
 
 if ($thread eq 1) {
     while(<$I>) {
@@ -99,7 +120,7 @@ mce_flow_f {
     \&flt_mce,
     $I;
 
-close $I;
+#close $I;
 exit 0;
 
 sub process_line {
@@ -140,7 +161,9 @@ sub process_line {
     if (scalar(@$newalts)==0) {
         $F[4] = '.';
     } else {
-        $F[4] = join ",", @ref_alts[@$newalts]; 
+        my @newalts = @ref_alts[@$newalts];
+        $F[4] = join ",", @newalts;
+        &norm_alle_alles([$F[3], @newalts], \@F) if $enable_norm_alle==1;
     }
     if($debug==1 and $F[1] eq '90651') { # debug
         say STDERR "replace: " . Dumper $replace;
@@ -149,6 +172,66 @@ sub process_line {
         die;
     }
     return join("\t", @F);
+}
+
+sub norm_alle_alles {
+    my ($alles, $F) = @_;
+    my ($skip_start, $skip_end) = &norm_alle_alles_cal_length($alles);
+    my $reflen = length $alles->[0];
+    foreach my $ialt (0..$#$alles) {
+        my $seq = $alles->[$ialt];
+        my $len = length $seq;
+        $seq = substr($seq, $skip_start, $len-$skip_start-$skip_end);
+        $alles->[$ialt] = $seq;
+    }
+    $$F[1] += $skip_start;
+    $$F[3] = $alles->[0];
+    $$F[4] = join ",", @$alles[1..$#$alles];
+}
+
+sub norm_alle_alles_cal_length {
+    my ($alles) = @_;
+    my @tie_seqs;
+    my ($skip_start, $skip_end) = (0, 0);
+    my $reflen = length $alles->[0];
+    my @alt_lens = map {length $_} @$alles;
+    foreach my $ialt (0..$#$alles) {
+        my $seq = $alles->[$ialt];
+        tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
+    }
+    # skip from end
+    LOOP_SKIP_END: while(1) {
+        my $last = $tie_seqs[0]->[-$skip_end-1];
+        foreach my $ialt (1..$#$alles) {
+            my $len = $alt_lens[$ialt];
+            if ($len <= $skip_end+1 or $tie_seqs[$ialt][-$skip_end-1] ne $last) {
+                last LOOP_SKIP_END;
+            }
+        }
+        if($skip_end+1 >= $reflen) {
+            last LOOP_SKIP_END;
+        } else {
+            $skip_end++;
+        }
+    }
+    # skip from start
+    LOOP_SKIP_START: while(1) {
+        my $first = $tie_seqs[0][$skip_start] // die $skip_start;
+        foreach my $ialt (1..$#$alles) {
+            my $len = $alt_lens[$ialt];
+            if ($len-$skip_end <= 1+$skip_start or $tie_seqs[$ialt][$skip_start] ne $first) {
+                #die;
+                last LOOP_SKIP_START;
+            }
+        }
+        if($skip_start+1 >= $reflen-$skip_end) {
+            last LOOP_SKIP_START;
+        } else {
+            $skip_start++;
+        }
+    }
+
+    return ($skip_start, $skip_end);
 }
 
 sub gen_replace_by_length_only {
@@ -167,6 +250,7 @@ sub gen_replace_by_length_only {
             $ref_alt_min_len*$min_diff_fold <= $ref_alt_max_len ) {
         # merge small alles
         my $max_len_tomerge_now = min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold));
+        #say STDERR "$max_len_tomerge_now = min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold));";
         if($reflen < $max_len_tomerge_now) {
             # merge small alles to ref
             foreach my $ialt (1..$ref_alts_maxi) {
