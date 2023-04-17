@@ -36,6 +36,7 @@ usage: perl $0 IN.vcf [OUT_PREFIX] [SV min length (default 50)]
 EOF
 }
 
+my $ARGVs = join(' ',@ARGV);
 my ($in, $out_prefix, $min_sv) = @ARGV;
 
 &help() unless $in;
@@ -54,6 +55,11 @@ while(my $line = <$I>) {
     chomp $line;
     next unless $line;
     if ($line=~/^#/) {
+        if ($line=~/^#CHROM/) {
+            say $O_SNP qq(##CommandLine="$0 $ARGVs");
+            say $O_INDEL qq(##CommandLine="$0 $ARGVs");
+            say $O_SV qq(##CommandLine="$0 $ARGVs");
+        }
         say $O_SNP $line;
         say $O_INDEL $line;
         say $O_SV $line;
