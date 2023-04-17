@@ -1,7 +1,7 @@
 def get_depth_file(wildcards):
-    if config['mode'] == 'genotype':
+    if config.get("modefile", config['mode']) == 'genotype':
         return('2.callSV.DPinfos.txt')
-    elif config['mode'] == 'augment':
+    elif config.get("modefile", config['mode']) == 'augment':
         return('2.callSV.aug.DPinfos.txt')
     else:
         print("Error mode!")
@@ -9,9 +9,9 @@ def get_depth_file(wildcards):
 
 
 def get_rawvcf_files(wildcards):
-    if config['mode'] == 'genotype':
+    if config.get("modefile", config['mode']) == 'genotype':
         return expand('2.callSV/{sample}/{sample}-{graph}.{map}.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ)
-    elif config['mode'] == 'augment':
+    elif config.get("modefile", config['mode']) == 'augment':
         return expand('2.callSV/{sample}/{sample}-{graph}.{map}.aug.q{minq}.call.ext.vcf.gz', sample=SAMPLES, graph=GRAPH, map=MAPPER, minq=MINQ)
     else:
         print("Error mode!")
@@ -130,10 +130,10 @@ rule realign1:
         vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '4.realign/1.realign1.{chrm}.vcf.gz',
-        vcf_sorted = '4.realign/1.realign1.{chrm}.sorted.vcf.gz',
+        vcf = '4.realign/1.realign0.{chrm}.vcf.gz',
+        vcf_sorted = '4.realign/1.realign0.{chrm}.sorted.vcf.gz',
     log:
-        'logs/4.1.realign1.{chrm}.vcf.gz.log'
+        'logs/4.1.realign0.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
@@ -143,36 +143,21 @@ rule realign1:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 6 >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 4 >> {log} 2>&1
         {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
-rule filter_maf1:
-    input:
-        vcf = '4.realign/1.realign1.{chrm}.sorted.vcf.gz'
-    output:
-        vcf = '4.realign/2.filter_maf1.{chrm}.vcf.gz'
-    log:
-        'logs/4.2.filter_maf1.{chrm}.vcf.gz.log'
-    threads: config['cores_realign']
-    params:
-        min_maf = config['genotype_MAF'],
-        max_miss_freq = config['max_missing_rate']
-    shell:
-        """
-        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} >> {log} 2>&1
-        """
 
-
+# sv
 rule realign2:
     input:
-        vcf = '4.realign/2.filter_maf1.{chrm}.vcf.gz',
+        vcf = '4.realign/1.realign0.{chrm}.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '4.realign/3.realign2.{chrm}.vcf.gz',
-        vcf_sorted = '4.realign/3.realign2.{chrm}.sorted.vcf.gz',
+        vcf = '4.realign/3.1.realign2.{chrm}.vcf.gz',
+        vcf_sorted = '4.realign/3.1.realign2.{chrm}.sorted.vcf.gz',
     log:
-        'logs/4.3.realign1.{chrm}.vcf.gz.log'
+        'logs/4.3.1.realign1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     resources:
         mem_mb=config['mem_realign']
@@ -188,9 +173,9 @@ rule realign2:
 
 rule filter_maf2:
     input:
-        vcf = '4.realign/3.realign2.{chrm}.sorted.vcf.gz'
+        vcf = '4.realign/3.1.realign2.{chrm}.sorted.vcf.gz'
     output:
-        vcf = '4.realign/4.filter_maf1.{chrm}.vcf.gz'
+        vcf = '4.realign/3.2.filter_maf1.{chrm}.vcf.gz'
     log:
         'logs/4.4.filter_maf1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -202,16 +187,17 @@ rule filter_maf2:
         perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} >> {log} 2>&1
         """
 
+# pav
 rule sv2pav:
     input:
         #vcf = '4.realign/4.filter_maf1.{chrm}.vcf.gz',
-        vcf = '4.realign/2.filter_maf1.{chrm}.vcf.gz',
+        vcf = '4.realign/1.realign0.{chrm}.vcf.gz',
     output:
-        vcf1 = '4.realign/2.2.pav.{chrm}.vcf.gz',
-        vcf2 = '4.realign/2.2.pav2.{chrm}.vcf.gz',
-        vcf2_sorted = '4.realign/2.2.pav2.{chrm}.sorted.vcf.gz',
+        vcf1 = '4.realign/2.1.pav1.{chrm}.vcf.gz',
+        vcf2 = '4.realign/2.1.pav2.{chrm}.vcf.gz',
+        vcf2_sorted = '4.realign/2.1.pav2.{chrm}.sorted.vcf.gz',
     log:
-        'logs/4.2.2.sv2pav.{chrm}.vcf.gz.log'
+        'logs/4.2.1.sv2pav.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
     params:
         tmpdir = config['memory_tmp_dir'],
@@ -223,6 +209,22 @@ rule sv2pav:
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} >> {log} 2>&1
         perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} --threads {threads} >> {log} 2>&1
         {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf2_sorted} -O z {output.vcf2} >> {log} 2>&1
+        """
+
+rule filter_maf1:
+    input:
+        vcf = '4.realign/2.1.pav2.{chrm}.sorted.vcf.gz'
+    output:
+        vcf = '4.realign/2.2.filter_maf1.{chrm}.vcf.gz'
+    log:
+        'logs/4.2.2.filter_maf1.{chrm}.vcf.gz.log'
+    threads: config['cores_realign']
+    params:
+        min_maf = config['genotype_MAF'],
+        max_miss_freq = config['max_missing_rate']
+    shell:
+        """
+        perl {workflow.basedir}/scripts/flt_vcf_maf_by_allele.pl --in {input.vcf} --out {output.vcf} --min_maf {params.min_maf} --max_miss_freq {params.max_miss_freq} --threads {threads} >> {log} 2>&1
         """
 
 # Finally
@@ -244,11 +246,11 @@ rule split_vcf_by_type2: # for non-split-chr
 if config['split_chr']==False:
     rule cp_to_final:
         input: 
-            vcf1 = '4.realign/2.2.pav2.all.sorted.vcf.gz',
-            vcf2 = '4.realign/4.filter_maf1.all.vcf.gz',
+            vcf1 = '4.realign/2.2.filter_maf1.all.vcf.gz',
+            #vcf2 = '4.realign/4.filter_maf1.all.vcf.gz',
         output:
             vcf1 = '5.final_result/1.final_mergechr.all.vcf.gz',
-            vcf2 = '5.final_result/2.final_mergechr.all.vcf.gz'
+            #vcf2 = '5.final_result/2.final_mergechr.all.vcf.gz'
         shell:
             """
             cp {input.vcf1} {output.vcf1}
@@ -257,10 +259,9 @@ if config['split_chr']==False:
 
 rule merge_vcf_splitchrs_pav:
     input:
-        vcfs = expand('4.realign/2.2.pav2.{chrm}.sorted.vcf.gz', chrm=CHRS),
+        vcfs = expand('4.realign/2.2.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
     output:
         vcf = '5.final_result/1.final_mergechr.pav.all.vcf.gz',
-        #vcf2 = '5.final_result/1.final_mergechr.pav.sv.vcf.gz'
     threads:
         4
     log:
@@ -271,29 +272,21 @@ rule merge_vcf_splitchrs_pav:
     shell:
         """
         {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} >> {log} 2>&1
-        #perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {output.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
         """
 
 
 rule merge_vcf_splitchrs:
     input:
-        vcfs = expand('4.realign/4.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+        vcfs = expand('4.realign/3.2.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
     output:
         vcf = '5.final_result/2.final_mergechr.all.vcf.gz',
-        #vcf_snp = '5.final_result/2.final_mergechr.snp.vcf.gz',
-        #vcf_indel = '5.final_result/2.final_mergechr.indel.vcf.gz',
-        #vcf_sv = '5.final_result/2.final_mergechr.sv.vcf.gz'
     threads:
         4
     log:
         'logs/5.1.merge.log'
-    params:
-        outprefix = '5.final_result/3.final_mergechr',
-        min_sv_len = config['SV_min_length']
     shell:
         """
         {BCFTOOLS} concat -o {output.vcf} -O z --threads {threads} {input.vcfs} >> {log} 2>&1
-        #perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {output.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
         """
 
 

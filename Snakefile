@@ -26,7 +26,7 @@ if config['split_chr']==True:
     if config['mode'] == 'genotype':
         rule all:
             input:
-                expand('4.realign/4.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+                expand('4.realign/2.2.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
                 '5.final_result/1.final_mergechr.pav.all.vcf.gz',
                 '5.final_result/1.final_mergechr.pav.sv.vcf.gz',
                 '5.final_result/2.final_mergechr.all.vcf.gz',

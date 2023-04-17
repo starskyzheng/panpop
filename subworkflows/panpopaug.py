@@ -19,6 +19,28 @@ def getpg_aug(wildcards):
     return('2.callSV/{sample}/{sample}-' + GRAPH + '.' + MAP + '.aug.pg')
 
 
+# Realign
+rule aug_realign0:
+    input:
+        vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
+        ref_fasta_file = GRAPH + '.gfa.fa'
+    output:
+        vcf = '4.realign/1.realign1.{chrm}.vcf.gz',
+        vcf_sorted = '4.realign/1.realign1.{chrm}.sorted.vcf.gz',
+    log:
+        'logs/4.1.realign1.{chrm}.vcf.gz.log'
+    threads: config['cores_realign']
+    resources:
+        mem_mb=config['mem_realign']
+    params:
+        realign_extend_bp_max = config['realign_extend_bp_max'],
+        realign_extend_bp_min = config['realign_extend_bp_min'],
+        tmpdir = config['memory_tmp_dir']
+    shell:
+        """
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 4 >> {log} 2>&1
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        """
 
 
 rule vcf2poss:
