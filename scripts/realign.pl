@@ -549,9 +549,10 @@ sub rebuild_cons_seqs {
     my %new_ids2alles;
     say STDERR "Now start rebuild_cons_seqs" if $debug;
     rebuild_cons_seqs_IDI:for (my $idi = 9; $idi <= $idi_max; $idi++) {
+        say STDERR "Now : $idi";
         #my %sites_status1; # -1:miss   0:ref    1:alt
         #my %sites_status2; # -1:miss   0:ref    1:alt
-        my %sites_status; # -1:miss   0:ref    1:alt_hetero  2:alt_hetero(changed_phase)  8:alt_homo  9:alt_already_overlaped
+        my %sites_status; # -1/undef:miss   0:ref    1:alt_hetero  2:alt_hetero(changed_phase)  8:alt_homo  9:alt_already_overlaped
         my $a1 = $ref;
         my $a2 = $ref;
         my $last_start = 99999999999999;
@@ -567,10 +568,7 @@ sub rebuild_cons_seqs {
             my $sv_end = $sv_start + $ref_len-1;
             my $alles = $$lines[$iline][$idi];
             if (!defined $alles) { # miss
-                for(my $p=$sv_start; $p<=$sv_end; $p++) {
-                    $sites_status{$p} = -1 if ( !exists $sites_status{$p} );
-                }
-                next; # skip this position for this sample
+                next ILINE; # skip this position for this sample
             } elsif ($$alles[0]==0 and $$alles[1]==0) { # ref
                 for(my $p=$sv_start; $p<=$sv_end; $p++) {
                     if ( (!exists $sites_status{$p}) or $sites_status{$p} == -1 ) {
@@ -692,13 +690,13 @@ sub rebuild_cons_seqs {
             }
         }
         my ($count_all, $count_miss) = (0,0);
-        foreach my $p (keys %sites_status) {
-            $count_all++;
-            if ($sites_status{$p} == -1) { # has miss
+        for(my $p=$win_start; $p<=$win_end; $p++) {
+            if((! exists $sites_status{$p}) or $sites_status{$p} == -1) {
                 $count_miss++;
             }
         }
-        if ($count_all == $count_miss) {
+        $count_all = $win_end-$win_start+1;
+        if ($count_all <= $count_miss) {
             # all missing
             $new_ids2alles{$idi} = undef;
             next rebuild_cons_seqs_IDI;
