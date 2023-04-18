@@ -33,6 +33,7 @@ use IPC::Open2;
 use Tie::CharArray;
 #use Clone qw(clone);
 use Storable qw(dclone);
+use File::Temp;
 
 require Exporter;
 
@@ -95,7 +96,7 @@ sub init {
     $ALN_PARAMS_max_tryi = $main::config->{realign_max_try_times_per_method};
     #$ALN_PARAMS{famsa} = "$famsa -t 1 -medoidtree -gt upgma STDIN STDOUT -keep-duplicates 2>/dev/null";
     $ALN_PARAMS{famsaP} = "$famsa -t 8 -medoidtree -gt upgma STDIN STDOUT -keep-duplicates 2>/dev/null";
-    $ALN_PARAMS{HAlignC} = "C";
+    $ALN_PARAMS{HAlignC} = "$HAlignC --in INFA --out OUTFA >/dev/null 2>&1";
     $ALN_PARAMS{mafft} = "$mafft --auto --thread 4 - 2>/dev/null" if $mafft;
     $ALN_PARAMS{muscle} = "$muscle3 -maxiters 16 -diags 2>/dev/null" if $muscle3;
     $init = 1;
@@ -120,14 +121,14 @@ sub select_aln_software {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
         $$lefti{muscle}--;
         return('muscle', $tried);
-    } elsif ( $$lefti{famsaP}>0 ) {
-        my $tried = $ALN_PARAMS_max_tryi-$$lefti{famsaP}+1;
-        $$lefti{famsaP}--;
-        return('famsaP', $tried);
     } elsif ( $$lefti{HAlignC}>0 ) { ##########
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{HAlignC}+1;
         $$lefti{HAlignC}--;
         return('HAlignC', $tried);
+    } elsif ( $$lefti{famsaP}>0 ) {
+        my $tried = $ALN_PARAMS_max_tryi-$$lefti{famsaP}+1;
+        $$lefti{famsaP}--;
+        return('famsaP', $tried);
     } elsif ( $length>50 and exists $$lefti{mafft} and $$lefti{mafft}>0 ) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{mafft}+1;
         $$lefti{mafft}--;
@@ -151,9 +152,9 @@ sub select_aln_software {
 
 
 
-sub aln_halign {
+sub aln_notpipeline {
     my ($selsoft, $alts, $max_alts) = @_;
-    my $algorithm = $ALN_PARAMS{$selsoft} // confess();
+    my $cmd_ori = $ALN_PARAMS{$selsoft} // confess();
     my $fastafh = File::Temp->new(DIR=>"$tmp_dir");
     my $fasta = $fastafh->filename;
     my $fastaaln = "$fasta.aln";
@@ -168,13 +169,11 @@ sub aln_halign {
         say $fastafh $alt_seq;
     }
     close $fastafh;
-    my $cmd;
-    if ($algorithm eq 'C') {
-        $cmd = "$HAlignC --in $fasta --out $fastaaln >/dev/null 2>&1";
-    } else {
-        confess();
-    }
+    my $cmd = $cmd_ori;
+    $cmd=~s/INFA/$fasta/ or confess();
+    $cmd=~s/OUTFA/$fastaaln/ or confess();
     my $aln_exit_status = system($cmd);
+    #`cp $fasta $fasta.err`;
     undef $fastafh;
     unless (-e $fastaaln) {
         #`cp $fasta $fasta.err`;
@@ -225,6 +224,7 @@ sub process_alts_aln_only {
     my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
     #my $t=$alt_max_length; #######
     #undef $alt_max_length;
+    #$force_aln_method = 'HAlignC'; #####
     if($max_alts == -1) {
         $max_alts = scalar(@$alts)-1;
     } elsif($force_realign==0 and $max_alts==1) { # biallic, to skip calculation
@@ -248,7 +248,7 @@ sub process_alts_aln_only {
     return undef unless defined $selsoft;
     my ($aln_exit_status, $aln_alts);
     if ($selsoft =~/^HAlign/) {
-        ($aln_exit_status, $aln_alts) = &aln_halign($selsoft, $alts, $max_alts);
+        ($aln_exit_status, $aln_alts) = &aln_notpipeline($selsoft, $alts, $max_alts);
     } else {
         ($aln_exit_status, $aln_alts) = &aln_pipeline($selsoft, $alts, $max_alts);
     }

@@ -466,7 +466,7 @@ sub process_line_new {
     if( ($ref_alt_max_length>1e3 and $max_alts>100)  or
                       ($ref_alt_max_length>1e5)  or
                       ($ref_alt_max_length>1000 and $alt_max_length>400) )  {
-        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, 'famsaP');
+        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length);
     } else {
         ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length);
     }
@@ -549,7 +549,7 @@ sub rebuild_cons_seqs {
     my %new_ids2alles;
     say STDERR "Now start rebuild_cons_seqs" if $debug;
     rebuild_cons_seqs_IDI:for (my $idi = 9; $idi <= $idi_max; $idi++) {
-        say STDERR "Now : $idi";
+        #say STDERR "Now : $idi"; # debug
         #my %sites_status1; # -1:miss   0:ref    1:alt
         #my %sites_status2; # -1:miss   0:ref    1:alt
         my %sites_status; # -1/undef:miss   0:ref    1:alt_hetero  2:alt_hetero(changed_phase)  8:alt_homo  9:alt_already_overlaped
