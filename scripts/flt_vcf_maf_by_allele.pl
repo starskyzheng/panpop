@@ -49,6 +49,8 @@ EOF
 exit(-1);
 }
 
+my $ARGVs = join ' ', @ARGV;
+
 GetOptions (
         'help|h!' => \$opt_help,
         'in|i=s' => \$in,
@@ -78,7 +80,7 @@ while(<$I>) {
     } elsif (/^#/) {
        @header = split(/\t/, $_);
        say $O '##INFO=<ID=AF,Number=1,Type=String,Description="Allele count">';
-       say $O "##Command=$0 @ARGV";
+       say $O qq(##CommandLine="$0 $ARGVs");
        say $O $_;
        last; 
     } else {
