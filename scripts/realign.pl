@@ -448,7 +448,7 @@ sub process_line_new {
         $alt_max_length = $len if $alt_max_length < $len;
         $alt_min_length = $len if $alt_min_length > $len;
     }
-    if ($force_realign==0 and($is_snp==1 or scalar(@$ref_alts)==2)) { ########## SNP #  or $alt_min_length<=1
+    if ($is_snp==1 or ($force_realign==0 and scalar(@$ref_alts)==2)) { ########## SNP #  or $alt_min_length<=1
         my $retline = &gen_lines_before_process($ids2alles, $ref_alts, $chr, $win_start);
         if ($retline) {
             return([$retline])

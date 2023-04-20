@@ -139,7 +139,7 @@ if ($threads==1) {
         gather => MCE::Candy::out_iter_fh($O)
     );
     mce_flow_f \&flt_mce, $I;
-    MCE::Flow->finish();
+    #MCE::Flow->finish();
     my $lines_cpx2 = $lines_cpx->export({ unbless => 1 });
     undef $lines_cpx;
     $lines_cpx = $lines_cpx2;
@@ -195,6 +195,9 @@ sub prase_line {
     # * to -
     @ref_alts = map { s/^\*$//g; $_ } map { s/^-$//g; $_ } @ref_alts;
     my $max_refaltsi = scalar(@ref_alts)-1;
+    if($force_cpx==0 and $max_refaltsi==1) {
+        return($line, 0);
+    }
     if ($force_cpx==0 and $max_refaltsi >= $max_refalts_threshold) {
         say STDERR "Too much alleles at $F[0]:$F[1] ($max_refaltsi)! push to lines_cpx" if $debug==1;
         return($line, 1);
@@ -319,13 +322,13 @@ sub get_identity_halign {
             $obj->{pair2indentities} = MCE::Shared->share({_DEEPLY_ => 1}, $pair2indentities_ori);
             $obj->{groups} = MCE::Shared->share({_DEEPLY_ => 1}, $group_ori);
             $obj->{parallel} = 1;
-            say STDERR "start MCE::Flow, count: " . scalar(@pairs);
-            MCE::Flow->init(
-               chunk_size => 1,
-               max_workers => $threads, 
-            );
+            #say STDERR "start MCE::Flow, count: " . scalar(@pairs);
+            #MCE::Flow->init(
+            #   chunk_size => 1,
+            #   max_workers => $threads, 
+            #);
             mce_flow sub{ &run_get_identity_halign_pair($_, $seqs, $obj) }, \@pairs;
-            MCE::Flow->finish;
+            #MCE::Flow->finish;
         }
     }
     # die Dumper $obj->{groups};
