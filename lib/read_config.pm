@@ -20,6 +20,7 @@ use strict;
 use warnings;
 use v5.24;
 use File::Spec;
+no warnings 'experimental::smartmatch';
 
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
@@ -50,30 +51,49 @@ use vars qw(
 @EXPORT    = qw(read_config_yaml);
 
 
+my @config_files = (
+    "$Bin/../configs/software.yaml",
+    "$Bin/../configs/base.yaml",
+);
+
+my @software_all = qw/stmsa bcftools vg tabix muscle3 bgzip famsa  mafft minigraph/;
+
+my @software_musthave = qw/stmsa bcftools vg tabix muscle3 bgzip famsa/;
+
 sub read_config_yaml {
-    my ($file) = @_;
-    my $config = LoadFile($file);
-    # remove empty item
-    foreach my $key (keys %$config) {
-        delete $config->{$key} if ref($config->{$key}) eq '' and $config->{$key} eq '';
+    #my (@files) = @_;
+    my @files = @config_files;
+    my %config;
+    foreach my $file(@files) {
+        my $config_tmp = LoadFile($file);
+        # remove empty item
+        foreach my $key (keys %$config_tmp) {
+            next if ref($config_tmp->{$key}) eq '' and $config_tmp->{$key} eq '';
+            $config{$key} = $config_tmp->{$key};
+        }
     }
-    foreach my $bin (qw/stmsa bcftools vg tabix muscle3 bgzip famsa
-                            mafft minigraph/) {
-        my $path = $config->{$bin};
+
+    foreach my $software_name (@software_all) {
+        my $path = $config{$software_name};
         next unless defined $path and $path ne '';
         my $bin_path_new = "$Bin/../$path";
-        if (-e $path and -x $path) {
-            $config->{$bin} = File::Spec->rel2abs($path);
+        my $which_path = `which $path 2>/dev/null`;
+        chomp $which_path;
+        if ($which_path and -e $which_path and -x $which_path) {
+            $config{$software_name} = File::Spec->rel2abs($which_path);
+            next;
+        } elsif (-e $path and -x $path) {
+            $config{$software_name} = File::Spec->rel2abs($path);
             next;
         }
         if (-e $bin_path_new and -x $bin_path_new) {
-            $config->{$bin} = File::Spec->rel2abs($bin_path_new);
+            $config{$software_name} = File::Spec->rel2abs($bin_path_new);
             next;
-        } else {
-            die "Error: $bin not found in $path or $bin_path_new or is not excutable\n";
+        } elsif($software_name ~~ @software_musthave) {
+            die "Error: $software_name not found in $path or $bin_path_new or is not excutable\n";
         }
     }
-    return $config;
+    return \%config;
 }
 
 1;

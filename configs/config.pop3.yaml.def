@@ -1,0 +1,13 @@
+
+#################### Basic Parameters ####################
+## Absolute paths are recommended for workdir and sample_reads_list_file
+# workdir: Dir contains sample_read.list and will store result files.
+workdir: "example_longreads"
+# sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
+sample_reads_list_file: "1.sample.reads.tsv"
+# mode: (simple or enhanced). `simple` mode will call SVs through 5 SV-caller and merge using PanPop `enhanced` recalculated depth information and then merge SVs using PanPop. Default is `simple`.
+mode: "simple"
+# fasta reference file
+ref: 'Ref.fa'
+
+

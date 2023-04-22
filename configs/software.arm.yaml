@@ -1,0 +1,16 @@
+#################### binary paths ####################
+## absolute paths are recommended instead of relative paths
+## ARM64
+# required:
+famsa: "misc_arm/famsa"
+stmsa: "misc_arm/stmsa"
+muscle3: "misc_arm/muscle"
+bcftools: "misc_arm/bcftools"
+vg: "misc_arm/vg"
+tabix: "misc_arm/tabix"
+bgzip: "misc_arm/bgzip"
+## optional but highly recommanded:
+mafft: ""
+# only for build_graph.pl
+minigraph: "misc_arm/minigraph"
+
