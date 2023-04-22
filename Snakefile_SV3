@@ -101,7 +101,7 @@ rule realign1:
         mem_mb = 40000
     shell:
         """
-        thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
         perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --first_merge >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
@@ -119,7 +119,8 @@ rule realign12:
         mem_mb = 40000
     shell:
         """
-        thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        #thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
         perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 6 --skip_mut_at_same_pos 2 >>{log} 2>&1
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
@@ -136,7 +137,8 @@ rule thin11:
     log: "logs/3.04.{sample}.thin11.log"
     shell:
         """
-        thread_num=`echo {threads} | awk '{{print $1/2}}'`
+        #thread_num=`echo {threads} | awk '{{print $1/2}}'`
+        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/2); print $a>1?$a:1'`
         perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.6 --threads $thread_num >>{log} 2>&1
         """
 
@@ -168,7 +170,8 @@ rule realign2:
         mem_mb = 20000
     shell:
         """
-        thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        #thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
         perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
@@ -185,7 +188,8 @@ rule thin21:
         mem_mb = 10000
     shell:
         """
-        thread_num=`echo {threads} | awk '{{print $1/2}}'`
+        #thread_num=`echo {threads} | awk '{{print $1/2}}'`
+        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/2); print $a>1?$a:1'`
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.5 --threads $thread_num >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
@@ -236,7 +240,8 @@ rule realign3:
         mem_mb = 4000
     shell:
         """
-        thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        #thread_num=`echo {threads} | awk '{{print $1/4}}'`
+        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
         perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 1000 --ext_bp_max 1000 --mask_bed_file {input.mask_bed} --skip_snp 1 >>{log} 2>&1
         """
 

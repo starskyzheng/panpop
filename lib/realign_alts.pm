@@ -87,10 +87,12 @@ sub init {
     $not_use_merge_alle_afterall = $main::not_use_merge_alle_afterall // 0;
     foreach my $refs ([$HAlignC, 'stmsa'], 
                       [$muscle3, 'muscle3'],
-                      [$mafft, 'mafft'],
+                      [$mafft, 'mafft',0],
                       [$famsa, 'famsa'] )  {
-        my ($exe, $name) = @$refs;
-        &check_bin_path($exe, $name) if defined $exe;
+        my ($exe, $name, $musthave) = @$refs;
+        if (defined $exe) {
+            &check_bin_path($exe, $name,$musthave) or delete $main::config->{$name};
+        }
     }
 
     $ALN_PARAMS_max_tryi = $main::config->{realign_max_try_times_per_method};
@@ -103,9 +105,13 @@ sub init {
 }
 
 sub check_bin_path {
-    my ($bin, $name) = @_;
+    my ($bin, $name, $musthave) = @_;
+    $musthave //= 1;
     return 1 if -x $bin;
-    system("which $bin >/dev/null 2>&1") == 0 or confess "$name path not found : $bin";
+    if(system("which $bin >/dev/null 2>&1") != 0) {
+        confess "$name path not found : $bin" if $musthave==1;
+        return 0;
+    }
     return 1;
 }
 

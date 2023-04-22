@@ -287,12 +287,11 @@ rule Assemblytics4Assemblytics:
     params:
         prefix = "03_vcf/05_Assemblytics/{sample}",
     threads: 1
-    log: "logs/2.{sample}.Assemblytics.4.Assemblytics.log"
     output:
         "03_vcf/05_Assemblytics/{sample}/4.Assemblytics.Assemblytics_structural_variants.bed"
     shell:
         """
-        cd {params.prefix}; {ASSEMBLYTICS} ./2.nucmer.filter ./4.Assemblytics 1000 50 10000000 > {log} 2>&1; cd ..
+        cd {params.prefix}; pwd; {ASSEMBLYTICS} ./2.nucmer.filter ./4.Assemblytics 1000 50 10000000; cd ..
         """
 
 rule Assemblytics5parse:

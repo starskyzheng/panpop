@@ -85,12 +85,11 @@ sub read_config_yaml {
         } elsif (-e $path and -x $path) {
             $config{$software_name} = File::Spec->rel2abs($path);
             next;
-        }
-        if (-e $bin_path_new and -x $bin_path_new) {
+        } elsif (-e $bin_path_new and -x $bin_path_new) {
             $config{$software_name} = File::Spec->rel2abs($bin_path_new);
             next;
         } elsif($software_name ~~ @software_musthave) {
-            die "Error: $software_name not found in $path or $bin_path_new or is not excutable\n";
+            die "Error: $software_name not found ( $path ) or $bin_path_new or is not excutable\n";
         }
     }
     return \%config;
