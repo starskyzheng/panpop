@@ -20,6 +20,7 @@ include: "subworkflows/callSV.py"
 SAMPLES = list_prepaire_files(config['sample_reads_list_file'])
 
 
+
 if config['split_chr']==True:
     CHRS = gfa2chrs( GRAPH + '.gfa')
     #CHRS = rgfa2chrs( GRAPH + '.rgfa')
@@ -55,8 +56,12 @@ elif config['split_chr']==False:
                 '9.aug_final_result/2.SNP.split.all.snp.vcf.gz', # Augment output SV VCF
                 '9.aug_final_result/7.PAV.all.sv.vcf.gz', # Augment output PAV VCF
 
-include: "subworkflows/panpopbase.py"
-include: "subworkflows/panpopaug.py"
+
+if config['mode'] == 'genotype':
+    include: "subworkflows/panpopbase.py"
+elif config['mode'] == 'augment':
+    include: "subworkflows/panpopbase.py"
+    include: "subworkflows/panpopaug.py"
 
 
 
