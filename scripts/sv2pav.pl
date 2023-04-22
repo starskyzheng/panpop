@@ -257,9 +257,13 @@ sub gen_replace_by_length_only {
     if ($ref_alt_max_len >= $sv_min_dp and $ref_alt_min_len <= $max_len_tomerge and
             $ref_alt_min_len*$min_diff_fold <= $ref_alt_max_len ) {
         # 将很短的ref/alt合并
-        my $max_len_tomerge_now = min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold));
+        my $max_len_tomerge_now = min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold),
+                                        max($ref_alt_max_len - $min_lendiff_tomerge,
+                                            int($ref_alt_max_len*$max_diff_fold) ) );
         #say STDERR "$max_len_tomerge_now = min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold));";
-        my $min_len_tomerge_now = max($ref_alt_max_len - $min_lendiff_tomerge, int($ref_alt_max_len*$max_diff_fold));
+        my $min_len_tomerge_now = max($ref_alt_max_len - $min_lendiff_tomerge, 
+                                        int($ref_alt_max_len*$max_diff_fold),
+                                        min($max_len_tomerge, int($ref_alt_max_len/$min_diff_fold)) );
         my $shortest_ialt;
         my $shortest_len = 999999999;
         my $longest_ialt;
