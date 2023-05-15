@@ -97,9 +97,9 @@ rule sort_bam:
         lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.bam".format(sample=wildcards.sample, platform=get_platform(wildcards))
     output:
         "02_bam/{sample}.{platform}.ngmlr.sort.bam"
-    threads: config['cores_ngmlr_map']
+    threads: 10
     resources:
-        mem_mb = config['cores_ngmlr_map'] * 1000
+        mem_mb = 10000
     shell:
         "samtools sort -@ {threads} -O BAM -o {output} {input} "
 
@@ -139,10 +139,13 @@ rule cuteSV_call_ont:
         "03_vcf/02_cuteSV/{sample}.ont.cuteSV.vcf"
     threads: config['cores_sv3_call']
     log: "logs/2.{sample}.cuteSV.ont.log"
+    params:
+        workdir = ".",
+    shadow: "shallow"
     resources:
         mem_mb = config['mem_sv3_call']
     shell:
-        "{CUTESV} {input.bam} {INDEX_REF} {output} ./ --threads {threads} --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3 --genotype 2>>{log}"
+        "{CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3 --genotype 2>>{log}"
 
 rule cuteSV_call_pb:
     input:
@@ -152,10 +155,13 @@ rule cuteSV_call_pb:
         "03_vcf/02_cuteSV/{sample}.pb.cuteSV.vcf"
     threads: config['cores_sv3_call']
     log: "logs/2.{sample}.cuteSV.pb.log"
+    params:
+        workdir = ".",
+    shadow: "shallow"
     resources:
         mem_mb = config['mem_sv3_call']
     shell:
-        "{CUTESV} {input.bam} {INDEX_REF} {output} ./ --threads {threads} --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5 --genotype 2>>{log}"
+        "{CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5 --genotype 2>>{log}"
 
 rule cuteSV_call_hifi:
     input:
@@ -165,10 +171,13 @@ rule cuteSV_call_hifi:
         "03_vcf/02_cuteSV/{sample}.hifi.cuteSV.vcf"
     threads: config['cores_sv3_call']
     log: "logs/2.{sample}.cuteSV.hifi.log"
+    params:
+        workdir = ".",
+    shadow: "shallow"
     resources:
         mem_mb = config['mem_sv3_call']
     shell:
-        "{CUTESV} {input.bam} {INDEX_REF} {output} ./ --threads {threads} --min_read_len 500 --max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5 --genotype 2>>{log}"
+        "{CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} --min_read_len 500 --max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5 --genotype 2>>{log}"
 
 
 rule svim_call:
