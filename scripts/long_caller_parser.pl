@@ -10,7 +10,7 @@ use zzIO;
 use zzBed;
 use List::Util qw(sum);
 no warnings 'experimental::smartmatch';
-# use Data::Dumper;
+use Data::Dumper;
 
 my ($in, $ref_fasta_file, $opt_help, $software, $not_rename);
 
@@ -210,11 +210,19 @@ LINE:while(<$I>) { # vcf
         if($svid =~ /svim.DEL\.\w+$/) {
             $type = 'DEL';
             next LINE if $min_dp>0 and $dp < $min_dp;
+            &Update_ref_alt(\@F, 'DEL') if $F[4] eq '<DEL>';
             # do nothing
         } elsif($svid =~ /svim.INS\.\w+$/) {
             $type = 'INS';
             next LINE if $min_dp>0 and $dp < $min_dp;
-            # do nothing
+            if ($F[4] eq '<INS>') {
+                my $ins_seq = &svim_ins_cal_seq(\@F);
+                if (! defined $ins_seq) {
+                    die;
+                }
+                $F[4] = $ins_seq;
+                &Update_ref_alt(\@F, 'INS');
+            }
         } elsif( $svid =~ /svim.INV\.\w+$/ ) {
             $type = 'INV';
             if (defined $out_inv) {
@@ -236,6 +244,7 @@ LINE:while(<$I>) { # vcf
         if($svid =~ /cuteSV.DEL\.\w+$/) {
             $type = 'DEL';
             next line if $min_dp>0 and $dp < $min_dp;
+            &Update_ref_alt(\@F, 'DEL');
             # do nothing
         } elsif($svid =~ /cuteSV.INS\.\w+$/) {
             $type = 'INS';
@@ -316,6 +325,24 @@ if (defined $out_inv) {
 exit;
 
 
+sub svim_ins_cal_seq {
+    my ($F) = @_;
+    my $info = $$F[7];
+    # SEQS
+    $info =~ /SEQS=([^;]+)/ or return undef;
+    my ($seqs) = $1;
+    my @seqs = split /,/, $seqs;
+    my %seqs_count;
+    for my $seq (@seqs) {
+        $seqs_count{$seq}++;
+    }
+    #die Dumper \%seqs_count;
+    my @seqs_sorted = sort {$seqs_count{$b} <=> $seqs_count{$a}} keys %seqs_count;
+    my $max_count_seq = $seqs_sorted[0];
+    #my @seqs_sorted = grep {$seqs_count{$_} == $max_count_seq} @seqs_sorted_i;
+    return $max_count_seq;
+}
+
 sub guess_software_by_svid {
     my ($svid) = @_;
     $svid = lc($svid);
@@ -346,12 +373,24 @@ sub max {
 
 
 sub Update_ref_alt {
-    my ($line, $type) = @_;
+    my ($line, $type, $svlen_parm) = @_;
     my $chr = $$line[0];
     my $pos = $$line[1];
     my $infos = $$line[7];
-    $infos =~ /SVLEN=([\-\de.+]+)(;|$)/ or die "no svlen: @$line";
-    my ($svlen) = ($1);
+    my $svlen;
+    if($svlen_parm) {
+        $svlen = $svlen_parm;
+    } else {
+        if($infos =~ /SVLEN=([\-\de.+]+)(;|$)/) {
+            $svlen = $1;
+        } else {
+            # END
+            if($infos =~ /END=(\d+)(;|$)/) {
+                $svlen = $1 - $pos + 1;
+            }
+        }
+        die "no svlen: @$line" if ! defined $svlen;
+    }
     $svlen = abs($svlen);
     die "chr not in fasta: $chr" if ! exists $$ref_fasta{$chr};
     my $ref_seq = \$$ref_fasta{$chr} // die "no ref seq for $chr";
