@@ -18,7 +18,9 @@ def get_platform(wildcards):
     try:
         #fa = S2T.iloc[S2T.index==sid, :].values[0][1]
         platform = S2T.loc[sid, 'platform']
+        platform = platform.lower()
     except:
+        print("Error! no platform for sid: {}".format(sid))
         1
     return platform
 
@@ -106,7 +108,7 @@ rule sort_bam:
 rule index:
     input:
         #"02_bam/{sample}.{platform}.ngmlr.sort.bam"
-        lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform'])
+        lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards))
         
     output:
         "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
@@ -120,8 +122,8 @@ rule sniffles_call:
     input:
         #"02_bam/{sample}.{platform}.ngmlr.sort.bam",
         #"02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
-        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform']),
-        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform'])
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards)),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards))
     output:
         vcf = "03_vcf/01_sniffles/{sample}.sniffles.vcf"
     threads: config['cores_sv3_call']
@@ -197,8 +199,8 @@ rule pbsv_align:
     input:
         #"02_bam/{sample}.{platform}.ngmlr.sort.bam",
         #"02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
-        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform']),
-        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform'])
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards)),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards))
     output:
         "02_bam/{sample}.pbsv.sort.bam",
     threads: 1
@@ -397,7 +399,7 @@ rule consensus_inv:
         #genome = INDEX_REF + ".genome",
         ref = INDEX_REF,
         bed1 = "03_vcf/01_sniffles/{sample}.sniffles.parse.inv.bed",
-        bed2 = lambda wildcards: "03_vcf/02_cuteSV/{sample}.{platform}.cuteSV.parse.inv.bed".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform']),
+        bed2 = lambda wildcards: "03_vcf/02_cuteSV/{sample}.{platform}.cuteSV.parse.inv.bed".format(sample=wildcards.sample, platform=get_platform(wildcards)),
         bed3 = "03_vcf/03_svim/{sample}/variants.parse.inv.bed",
         bed4 = "03_vcf/04_pbsv/{sample}/pbsv.parse.inv.bed",
     output:
@@ -419,7 +421,7 @@ rule consensus_inv:
 def get_consensus_Assemblytics_vcf(wildcards):
     sid = wildcards.sample
     fa = get_assb_fasta(wildcards)
-    platform = S2T.loc[sid, 'platform']
+    platform = get_platform(wildcards)
     vcfs = ["03_vcf/01_sniffles/{}.sniffles.parse.vcf.gz".format(sid),
                 #lambda wildcards: "03_vcf/02_cuteSV/{sample}.{platform}.cuteSV.parse.vcf.gz".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform']),
                 "03_vcf/02_cuteSV/{}.{}.cuteSV.parse.vcf.gz".format(sid, platform),
