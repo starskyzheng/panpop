@@ -99,7 +99,7 @@ rule merge_vcf_same_pos:
         mem_mb = 8000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_vcf_same_pos.pl --invcf {input.vcf} --outvcf {output.vcf} --ref {input.ref} --skip_mut_at_same_pos 2 --threads 30 --ignore_dp >>{log} 2>&1 && \
+        perl {workflow.basedir}/scripts/merge_vcf_same_pos.pl --invcf {input.vcf} --outvcf {output.vcf} --ref {input.ref} --skip_mut_at_same_pos 2 --threads {threads} --ignore_dp >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
 
