@@ -14,36 +14,65 @@ configfile: "configs/software.yaml"
 configfile: "configs/base.yaml"
 configfile: "configs/config.pop3.yaml"
 
+#conda: 'panpop'
+conda: 'conda.panpop1.yaml'
 
 #SAMPLE_INDEX = {"Alo-0", "Cas-0", "Cat-0", "Col-0", "Cvi-0", "Hom-4", "Hum-2", "Ler-0", "Ped-0"}
 SAMPLE_LIST = config['sample_reads_list_file']
 INDEX_REF = "Ref.fa"
 
-SLURM_PART = 'pNormal'
 
 MIN_SUPPORT_CALLER = 2 # Min support SV Caller count, Default 2
 
+def exe_check_ret_abs_path(exe):
+    if exe is None:
+        raise Exception("Error!!! config error: {}".format(exe))
+    if os.path.exists(exe) and os.path.isfile(exe) and os.access(exe, os.X_OK):
+        abspath = os.path.abspath(exe)
+        return abspath
+    elif shutil.which(exe) is not None:
+        abspath = shutil.which(exe)
+        return abspath
+    else:
+        raise Exception("Can't find executable: {}".format(exe))
+
+
 # paths
-NGMLR = shutil.which(config['ngmlr'])
-SNIFFLES = shutil.which(config['sniffles'])
-CUTESV = shutil.which(config['cutesv'])
-SVIM = shutil.which(config['svim'])
-PICARD = shutil.which(config['picard'])
-#SURVIVOR = shutil.which(config['survivor'])
-PBSV = shutil.which(config['pbsv'])
-NUCMER = shutil.which(config['nucmer'])
-DELTAFILTER = shutil.which(config['deltafilter'])
-SHOWCOORDS = shutil.which(config['showcoords'])
-ASSEMBLYTICS = shutil.which(config['assemblytics'])
-BEDTOOLS = shutil.which(config['bedtools'])
-BCFTOOLS = shutil.which(config['bcftools'])
-TABIX = shutil.which(config['tabix'])
+NGMLR = exe_check_ret_abs_path(config['ngmlr'])
+SNIFFLES = exe_check_ret_abs_path(config['sniffles'])
+CUTESV = exe_check_ret_abs_path(config['cutesv'])
+SVIM = exe_check_ret_abs_path(config['svim'])
+PICARD = exe_check_ret_abs_path(config['picard'])
+#SURVIVOR = exe_check_ret_abs_path(config['survivor'])
+PBSV = exe_check_ret_abs_path(config['pbsv'])
+NUCMER = exe_check_ret_abs_path(config['nucmer'])
+DELTAFILTER = exe_check_ret_abs_path(config['deltafilter'])
+SHOWCOORDS = exe_check_ret_abs_path(config['showcoords'])
+ASSEMBLYTICS = exe_check_ret_abs_path(config['assemblytics'])
+BEDTOOLS = exe_check_ret_abs_path(config['bedtools'])
+BCFTOOLS = exe_check_ret_abs_path(config['bcftools'])
+TABIX = exe_check_ret_abs_path(config['tabix'])
 
 ZWORKDIR = config['workdir']
 workdir: ZWORKDIR
 
 
-S2T = pd.read_csv(SAMPLE_LIST, sep='\t', index_col='sample')
+
+def read_input_sample_csv(file):
+    df = pd.read_csv(file, sep='\t', index_col='sample')
+    # must contain columns: sample, fq, AssmbFasta, platform
+    if not set(['fq', 'AssmbFasta', 'platform']).issubset(df.columns):
+        print(df.columns)
+        raise Exception("Input file must contain columns: sample, fq, AssmbFasta, platform: {}".format(file))
+    # set platform to lower case
+    df['platform'] = df['platform'].str.lower()
+    # platform must be one of: hifi, pacbio, ont (in lower case)
+    if not set(['hifi', 'pacbio', 'ont']).issuperset(df['platform']):
+        raise Exception("platform must be one of: hifi, pacbio, ont (in small case): {}".format(file))
+    return df
+
+#S2T = pd.read_csv(SAMPLE_LIST, sep='\t', index_col='sample')
+S2T = read_input_sample_csv(SAMPLE_LIST)
 SAMPLE_INDEX = S2T.index
 
 include: "subworkflows/callSV3.py"
@@ -64,7 +93,7 @@ rule merge_vcf_same_pos:
     output:
         vcf = "04_consensus_vcf/{sample}/02.merge_vcf_same_pos.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/02.merge_vcf_same_pos.sort.vcf.gz",
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.02.{sample}.merge_vcf_same_pos.log"
     resources:
         mem_mb = 8000
@@ -95,14 +124,13 @@ rule realign1:
     output:
         vcf = "04_consensus_vcf/{sample}/03.realign1.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/03.realign1.sort.vcf.gz",
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.03.{sample}.realign1.log"
     resources:
         mem_mb = 40000
     shell:
         """
-        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --first_merge >>{log} 2>&1 && \
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --first_merge >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
 
@@ -113,15 +141,13 @@ rule realign12:
     output:
         vcf = "04_consensus_vcf/{sample}/03.realign2.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/03.realign2.sort.vcf.gz",
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.03.{sample}.realign12.log"
     resources:
         mem_mb = 40000
     shell:
         """
-        #thread_num=`echo {threads} | awk '{{print $1/4}}'`
-        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 6 --skip_mut_at_same_pos 2 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 6 --skip_mut_at_same_pos 2 >>{log} 2>&1
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
 
@@ -131,15 +157,13 @@ rule thin11:
         vcf = "04_consensus_vcf/{sample}/03.realign2.sort.vcf.gz",
     output:
         vcf = "04_consensus_vcf/{sample}/04.thin1.vcf.gz"
-    threads: 64
+    threads: config['cores_realign']
     resources:
         mem_mb = 10000
     log: "logs/3.04.{sample}.thin11.log"
     shell:
         """
-        #thread_num=`echo {threads} | awk '{{print $1/2}}'`
-        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/2); print $a>1?$a:1'`
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.6 --threads $thread_num >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.6 --threads {threads} >>{log} 2>&1
         """
 
 # perl {workflow.basedir}/scripts/sv2pav.pl --invcf 7.thin1.vcf.gz --outvcf 7.thin2.vcf.gz --max_len_tomerge 5 --sv_min_dp 50
@@ -148,7 +172,7 @@ rule thin12:
         vcf = "04_consensus_vcf/{sample}/04.thin1.vcf.gz",
     output:
         vcf = "04_consensus_vcf/{sample}/04.thin2.vcf.gz"
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.04.{sample}.thin12.log"
     resources:
         mem_mb = 4000
@@ -164,15 +188,13 @@ rule realign2:
     output:
         vcf = "04_consensus_vcf/{sample}/05.realign2.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/05.realign2.sort.vcf.gz",
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.05.{sample}.realign2.log"
     resources:
         mem_mb = 20000
     shell:
         """
-        #thread_num=`echo {threads} | awk '{{print $1/4}}'`
-        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1 && \
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
 
@@ -182,15 +204,13 @@ rule thin21:
     output:
         vcf = "04_consensus_vcf/{sample}/06.thin1.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/06.thin1.sort.vcf.gz"
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.06.{sample}.thin21.log"
     resources:
         mem_mb = 10000
     shell:
         """
-        #thread_num=`echo {threads} | awk '{{print $1/2}}'`
-        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/2); print $a>1?$a:1'`
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.5 --threads $thread_num >>{log} 2>&1 && \
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1 && \
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
     
@@ -200,7 +220,7 @@ rule thin22:
     output:
         vcf = "04_consensus_vcf/{sample}/06.thin2.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/06.thin2.sort.vcf.gz"
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.06.{sample}.thin22.log"
     resources:
         mem_mb = 4000
@@ -234,15 +254,13 @@ rule realign3:
         mask_bed = "04_consensus_vcf/{sample}/02.merge_vcf_same_pos.sort.vcf.gz.mask.bed"
     output:
         vcf = "04_consensus_vcf/{sample}/08.realign_merge.vcf.gz"
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.08.{sample}.realign3.log"
     resources:
         mem_mb = 4000
     shell:
         """
-        #thread_num=`echo {threads} | awk '{{print $1/4}}'`
-        thread_num=`echo {threads} | perl -ne 'chomp;$a=int($_/4); print $a>1?$a:1'`
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads $thread_num --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 1000 --ext_bp_max 1000 --mask_bed_file {input.mask_bed} --skip_snp 1 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 1000 --ext_bp_max 1000 --mask_bed_file {input.mask_bed} --skip_snp 1 >>{log} 2>&1
         """
 
 rule thin32:
@@ -252,7 +270,7 @@ rule thin32:
         vcf = "04_consensus_vcf/{sample}/09.thin2.vcf.gz",
         vcfsorted = "04_consensus_vcf/{sample}/09.thin2.sort.vcf.gz",
         vcfsorted_tbi = "04_consensus_vcf/{sample}/09.thin2.sort.vcf.gz.tbi"
-    threads: 64
+    threads: config['cores_realign']
     log: "logs/3.06.{sample}.thin22.log"
     resources:
         mem_mb = 4000
