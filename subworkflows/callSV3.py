@@ -53,46 +53,34 @@ rule fq_make_softlink:
             os.symlink(fq_path, fq_dst_path)
             return fq_dst_path
 
-rule ngmlr_alignment_ont:
+def get_ngmlr_parms(wildcards):
+    platform = wildcards.platform
+    if platform == 'ont':
+        return " -x ont "
+    elif platform == 'pb':
+        return " -x pacbio "
+    elif platform == 'hifi':
+        return " -x pacbio "
+    else:
+        print("Error! platform error: {}".format(platform))
+        1
+
+rule ngmlr_alignment:
     input:
-        reads = "01_raw_data/{sample}.ont.fq.gz",
+        reads = "01_raw_data/{sample}.{platform}.fq.gz",
         ref = INDEX_REF
     output:
-        "02_bam/{sample}.ont.ngmlr.bam"
+        "02_bam/{sample}.{platform}.ngmlr.bam"
         #"02_bam/{sample}.ngmlr.sort.bam"
     threads: config['cores_ngmlr_map']
     resources:
         mem_mb = config['mem_ngmlr_map'],
-    log: "logs/1.{sample}.ngmlr.ont.log"
+    log: "logs/1.{sample}.ngmlr.{platform}.log"
+    params:
+        extra_parm = lambda wildcards: get_ngmlr_parms(wildcards)
     shell:
-        "{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout -x ont 2>>{log} | perl -alne 'print and next if /^\@/; next if $F[4]<0; next if length($F[9])!=length($F[10]); print' 2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
+        "{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout {params.extra_parm} 2>>{log} | perl -alne 'print and next if /^\@/; next if $F[4]<0; next if length($F[9])!=length($F[10]); print' 2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
         #"{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout -x ont | perl -lne 'print and next if /^\@/; /^\S+\t\S+\t\S+\t\S+\t(\S+)/ or die; print if $1>=0' | samtools view -h -o {output} --output-fmt BAM" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
-
-rule ngmlr_alignment_pb:
-    input:
-        reads = "01_raw_data/{sample}.pb.fq.gz",
-        ref = INDEX_REF,
-    output:
-        "02_bam/{sample}.pb.ngmlr.bam"
-    threads: config['cores_ngmlr_map']
-    log: "logs/1.{sample}.ngmlr.pb.log"
-    resources:
-        mem_mb = config['mem_ngmlr_map']
-    shell:
-        "{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout 2>>{log} | perl -alne 'print and next if /^\@/; next if $F[4]<0; next if length($F[9])!=length($F[10]); print'  2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
-
-rule ngmlr_alignment_hifi:
-    input:
-        reads = "01_raw_data/{sample}.hifi.fq.gz",
-        ref = INDEX_REF,
-    output:
-        "02_bam/{sample}.hifi.ngmlr.bam"
-    threads: config['cores_ngmlr_map']
-    log: "logs/1.{sample}.ngmlr.hifi.log"
-    resources:
-        mem_mb = config['mem_ngmlr_map']
-    shell:
-        "{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout 2>>{log} | perl -alne 'print and next if /^\@/; next if $F[4]<0; next if length($F[9])!=length($F[10]); print' 2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
 
 rule sort_bam:
     input:
@@ -133,53 +121,40 @@ rule sniffles_call:
     shell:
         "{SNIFFLES} -t {threads} --input {input.bam} --vcf {output.vcf} 2>>{log}"
 
-rule cuteSV_call_ont:
-    input:
-        bam = "02_bam/{sample}.ont.ngmlr.sort.bam",
-        bai = "02_bam/{sample}.ont.ngmlr.sort.bam.bai"
-    output:
-        "03_vcf/02_cuteSV/{sample}.ont.cuteSV.vcf"
-    threads: config['cores_sv3_call']
-    log: "logs/2.{sample}.cuteSV.ont.log"
-    params:
-        workdir = ".",
-    shadow: "shallow"
-    resources:
-        mem_mb = config['mem_sv3_call']
-    shell:
-        "{CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3 --genotype 2>>{log}"
 
-rule cuteSV_call_pb:
-    input:
-        bam = "02_bam/{sample}.pb.ngmlr.sort.bam",
-        bai = "02_bam/{sample}.pb.ngmlr.sort.bam.bai"
-    output:
-        "03_vcf/02_cuteSV/{sample}.pb.cuteSV.vcf"
-    threads: config['cores_sv3_call']
-    log: "logs/2.{sample}.cuteSV.pb.log"
-    params:
-        workdir = ".",
-    shadow: "shallow"
-    resources:
-        mem_mb = config['mem_sv3_call']
-    shell:
-        "{CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5 --genotype 2>>{log}"
+def get_cuteSV_call_parms(wildcards):
+    platform = wildcards.platform
+    if platform == 'ont':
+        return " --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3 "
+    elif platform == 'pb':
+        return " --min_read_len 500 --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5 "
+    elif platform == 'hifi':
+        return " --min_read_len 500 --max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5 "
+    else:
+        print("Error! platform error: {}".format(platform))
+        1
 
-rule cuteSV_call_hifi:
+
+rule cuteSV_call:
     input:
-        bam = "02_bam/{sample}.hifi.ngmlr.sort.bam",
-        bai = "02_bam/{sample}.hifi.ngmlr.sort.bam.bai"
+        bam = "02_bam/{sample}.{platform}.ngmlr.sort.bam",
+        bai = "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
     output:
-        "03_vcf/02_cuteSV/{sample}.hifi.cuteSV.vcf"
+        "03_vcf/02_cuteSV/{sample}.{platform}.cuteSV.vcf"
     threads: config['cores_sv3_call']
-    log: "logs/2.{sample}.cuteSV.hifi.log"
+    log: "logs/2.{sample}.cuteSV.{platform}.log"
     params:
-        workdir = ".",
-    shadow: "shallow"
+        workdir = "03_vcf/02_cuteSV/{sample}.tmp",
+        extra_parm = lambda wildcards: get_cuteSV_call_parms(wildcards)
+    #shadow: "shallow"
     resources:
         mem_mb = config['mem_sv3_call']
     shell:
-        "{CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} --min_read_len 500 --max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5 --genotype 2>>{log}"
+        """
+        mkdir {params.workdir}
+        {CUTESV} {input.bam} {INDEX_REF} {output} {params.workdir} --threads {threads} {params.extra_parm} --genotype 2>>{log}
+        """
+
 
 
 rule svim_call:
