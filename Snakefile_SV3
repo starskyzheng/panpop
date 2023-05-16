@@ -67,8 +67,8 @@ def read_input_sample_csv(file):
     # set platform to lower case
     df['platform'] = df['platform'].str.lower()
     # platform must be one of: hifi, pacbio, ont (in lower case)
-    if not set(['hifi', 'pacbio', 'ont']).issuperset(df['platform']):
-        raise Exception("platform must be one of: hifi, pacbio, ont (in small case): {}".format(file))
+    if not set(['hifi', 'pb', 'ont']).issuperset(df['platform']):
+        raise Exception("platform must be one of: hifi, pb, ont: {}".format(file))
     return df
 
 #S2T = pd.read_csv(SAMPLE_LIST, sep='\t', index_col='sample')
