@@ -35,42 +35,43 @@ use Getopt::Long;
 use read_config qw/read_config_yaml/;
 
 
-
-
-sub help() {
-        die "usage: perl x.pl [options]
-        -v|--vcfposs <str>     input vcfposs file
-        -l|--list_packpg <str> input pack_pg file
-        -o|--outdir <str>      output dir
-        -t                     threads number
-        -h|--help              help
-        --chr                  process this chromsome only
-        ";
-}
-
 my $config = read_config_yaml("$Bin/../config.yaml");
 my $vg = $$config{vg};
+my $samtools = $$config{samtools} or die;
 
 my ($vcfposs_file, $packpg_list_file, $outdir, $need_chr);
+my ($output_dpinfo, $output_dpinfo_fh);
 my ($opt_help);
-my $threads = 10;
+my $threads = 1;
+my $min_dp = 3;
+my $input_format = 'vg';
+
 GetOptions (
         'help|h!' => \$opt_help,
         'v|vcfposs=s' => \$vcfposs_file,
-        't=i' => \$threads,
+        't|threads=i' => \$threads,
         'l|list_packpg=s' => \$packpg_list_file,
         'o|outdir=s' => \$outdir,
         'chr=s' => \$need_chr,
+        'input_format=s' => \$input_format,
+        'output_avgdpinfo=s' => \$output_dpinfo,
+        'min_dp=i' => \$min_dp,
 );
 &help() if $opt_help;
 &help() unless defined $vcfposs_file and defined $packpg_list_file and defined $outdir;
+&help("input_format error!") unless $input_format eq 'vg' or $input_format eq 'bam';
 
-$need_chr = undef if $need_chr eq 'all';
+$need_chr = undef if defined $need_chr and $need_chr eq 'all';
+if (defined $output_dpinfo) {
+    $output_dpinfo_fh = open_out_fh($output_dpinfo);
+    say $output_dpinfo_fh join "\t", qw/#sid  ref_count  ref_dp  nr_count  nr_dp/;
+}
 
 my $dp_around_bp=100;
 
-my ($gams) = &read_packpg_list_file($packpg_list_file);
-my $need_ids = [ sort keys %$gams ]; ##########
+my $infiless = $input_format eq 'vg' ? &read_packpg_list_file($packpg_list_file) : &read_bam_list_file($packpg_list_file);
+
+my $need_ids = [ sort keys %$infiless ]; ##########
 $threads = scalar(@$need_ids) if $threads > scalar(@$need_ids);
 say STDERR "Start to calculate depth for: " . join(' ', @$need_ids);
 
@@ -83,12 +84,12 @@ say STDERR "Done read vcf_poss_file";
 
 if ($threads==1) {
     foreach my $sid (@$need_ids) {
-        die unless exists $$gams{$sid};
-        my ($pack, $pg) = $$gams{$sid}->@*;
+        die unless exists $$infiless{$sid};
+        my $infiles = $$infiless{$sid};
         my $outfile = "$outdir/$sid.depth.txt.gz";
         my $O = open_out_fh($outfile);
         say STDERR "$sid start";
-        &process_dp($pack, $pg, $sid, $O);
+        &process_dp($infiles, $sid, $O);
         say STDERR "$sid Done";
     }
 } else { # multi-threads
@@ -97,12 +98,12 @@ if ($threads==1) {
     );
     mce_loop {
         my $sid = $_;
-        die unless exists $$gams{$sid};
-        my ($pack, $pg) = $$gams{$sid}->@*;
+        die unless exists $$infiless{$sid};
+        my $infiles = $$infiless{$sid};
         my $outfile = "$outdir/$sid.depth.txt.gz";
         my $O = open_out_fh($outfile);
         say STDERR "$sid start";
-        &process_dp($pack, $pg, $sid, $O);
+        &process_dp($infiles, $sid, $O);
         say STDERR "$sid Done";
     } (@$need_ids);
     MCE::Loop->finish;
@@ -131,26 +132,49 @@ sub read_vcf_poss_file {
 }
 
 sub process_dp {
-    my ($pack, $pg, $sid, $O) = @_;
+    my ($infiles, $sid, $O) = @_;
     my (%counts, %sum_dps);
-    die unless -e $pack;
-    die unless -e $pg;
-    my $cmd = "$vg depth --threads 4 --pack $pack $pg";
-    if (defined $need_chr) {
-        $cmd .= " --ref-path $need_chr";
+    my $cmd;
+    if($input_format eq 'vg') {
+        my ($pack, $pg) = @$infiles;
+        die unless -e $pack;
+        die unless -e $pg;
+        $cmd = "$vg depth --threads 4 --pack $pack $pg";
+        if (defined $need_chr) {
+            $cmd .= " --ref-path $need_chr";
+        }
+    } elsif ($input_format eq 'bam') {
+        my ($bam) = @$infiles;
+        die unless -e $bam;
+        $cmd = "$samtools depth -a $bam";
+        if (defined $need_chr) {
+            $cmd .= " -r $need_chr";
+        }
+    } else {
+        die "input_format error!";
     }
     #$cmd = 'zcat ~/a.gz'; ############# debug
     open(my $P, "$cmd |");
+    my $is_first_line = 1;
     my %buf;
-    my $chr_old;
+    my @buf_all_tmp;
+    my %buf_all_all;
+    my $chr_old = '???';
     LINEDP:while(<$P>) {
         # chr pos dp
         #  0   1   2
         chomp;
         next unless $_;
         my ($chr, $pos, $dp) = split(/\t/, $_); # 1 based
-        $chr_old //= $chr;
+        next if $dp==0;
         if ($chr_old ne $chr) {
+            if ($is_first_line==1) {
+                $chr_old = $chr;
+                $is_first_line=0;
+                redo;
+            }
+            &add_dp_summary($chr_old, \%buf_all_all, \@buf_all_tmp);
+            @buf_all_tmp=();
             foreach my $end (sort {$a<=>$b} keys %buf) {
                 &print1($buf{$end}, $chr_old, $end, $O);
             }
@@ -158,6 +182,8 @@ sub process_dp {
             $chr_old = $chr;
             redo LINEDP;
         }
+        $buf_all_tmp[0]++;
+        $buf_all_tmp[1] += $dp;
         $lastpos = -1 if ($lastpos > $pos); # change chr
         for(;$lastpos<=$pos; $lastpos++) {
             #say("$lastpos $pos $chr"); # debug
@@ -176,7 +202,7 @@ sub process_dp {
             if ($pos <= $end) {
                 foreach my $start (sort {$a<=>$b} keys %{$buf{$end}}) {
                     die unless $pos >= $start;
-                    $buf{$end}{$start}[0] += 1 if $dp > 3;
+                    $buf{$end}{$start}[0] += 1 if $dp > $min_dp;
                     $buf{$end}{$start}[1] += $dp;
                 }
             } else {
@@ -184,6 +210,25 @@ sub process_dp {
                 &print1($toprint, $chr_old, $end, $O);
             }
         }
+    }
+    &add_dp_summary($chr_old, \%buf_all_all, \@buf_all_tmp);
+    if(defined $output_dpinfo) {
+        my $ref_count = $buf_all_all{ref}[0] // 0;
+        my $ref_sumdp = $buf_all_all{ref}[1] // 0;
+        my $nonref_count = $buf_all_all{nonref}[0] // 0;
+        my $nonref_sumdp = $buf_all_all{nonref}[1] // 0;
+        say $output_dpinfo_fh join "\t", $sid, $ref_count, $ref_sumdp, $nonref_count, $nonref_sumdp;
+    }
+}
+
+sub add_dp_summary {
+    my ($chr, $buf_all_all, $buf_all_tmp) = @_;
+    if($chr=~/^\d+$/) { # ref
+        $$buf_all_all{ref}[0] += $$buf_all_tmp[0];
+        $$buf_all_all{ref}[1] += $$buf_all_tmp[1];
+    } else { # non-ref
+        $$buf_all_all{nonref}[0] += $$buf_all_tmp[0];
+        $$buf_all_all{nonref}[1] += $$buf_all_tmp[1];
     }
 }
 
@@ -215,3 +260,38 @@ sub read_packpg_list_file {
     return \%ret;
 }
 
+sub read_bam_list_file {
+    my ($file) = @_;
+    my $I = open_in_fh($file);
+    my %ret;
+    while(<$I>) {
+        # SampleID xx.pack xx.pg
+        chomp;
+        next unless $_;
+        next if /^#/;
+        my ($sid, $bam) = split(/\s+/, $_);
+        die "$bam not exists!" unless -s $bam;
+        $ret{$sid} = [$bam];
+    }
+    return \%ret;
+}
+
+
+sub help() {
+    my ($info) = @_;
+    if (defined $info) {
+        say STDERR $info;
+        say STDERR "----------------------------------------";
+    }
+    die "usage: perl x.pl [options]
+        -v|--vcfposs <file>     input vcfposs file
+        -l|--list_packpg <file> input pack_pg file
+        -o|--outdir <dir>       output dir
+        -t|--threads| <int>     threads number. Default: $threads
+        -h|--help               help
+        --chr <str>             process this chromsome only. Default: all
+        --input_format <str>    vg or bam. Default: vg
+        --output_avgdpinfo <file>  output avg dpinfo file. Default: not output
+        --min_dp <int>          min depth to count. Default: $min_dp
+        ";
+}
