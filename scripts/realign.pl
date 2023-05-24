@@ -58,7 +58,7 @@ our $tmp_dir = $tmp_dir_def;
 my $first_merge = 0;
 my $chr_tolerance = 0;
 our $force_realign = 0;
-our $not_use_merge_alle_afterall = 0;
+our $not_use_merge_alle_afterall = 0; # realign后合并兼容的位点（两个位点的个体信息一致）
 my $mask_bed_file;
 my $mask_bed;
 my $skip_snp = 0;
@@ -717,8 +717,7 @@ sub rebuild_cons_seqs {
     say STDERR "Debug: phase: @phase_issue_ids" if ($debug>=1 and @phase_issue_ids);
     my @new_ref_alts;
     push @new_ref_alts, $_ foreach sort {$new_ref_alts{$a}<=>$new_ref_alts{$b}} keys %new_ref_alts;
-    #say STDERR Dumper \%new_ref_alts;
-    #die;
+    #say STDERR "new_ref_alts: " . Dumper \%new_ref_alts;
    return(\@new_ref_alts, \%new_ids2alles);
 }
 
@@ -783,6 +782,8 @@ sub thin_alts {
     my $now_maxalle=0;
     for (my $i = 0; $i <= $max_alts ; $i++) {
         my $seq = $$alts[$i];
+        $seq = '*' if $seq eq '';
+        $seq = uc $seq;
         if (exists $seq2remapi{$seq}) {
             $remapi{$i} = $seq2remapi{$seq};
             next;
@@ -792,10 +793,6 @@ sub thin_alts {
         $now_maxalle++;
         push $seq2i{$seq}->@*, $i;
         push @new_alts, $seq;
-    }
-    for(my $i=0; $i<@new_alts; $i++) {
-        $new_alts[$i]='*' if $new_alts[$i] eq '';
-        $new_alts[$i] = uc $new_alts[$i];
     }
     my $new_ref = shift @new_alts;
     return(\%remapi, $new_ref, \@new_alts);
