@@ -48,9 +48,9 @@ cores_pack: 10
 cores_call: 10
 cores_augment: 5
 cores_avgdp: 6
-cores_realign: 40
+cores_realign: 20
 cores_aug_filldp: 2
-cores_ngmlr_map: 40
+cores_ngmlr_map: 20
 cores_sv3_call: 20
 # for minimizer/gaffe mapper
 mem_xg: 60000

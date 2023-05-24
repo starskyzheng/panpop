@@ -23,6 +23,7 @@ deltafilter: 'delta-filter'
 showcoords: 'show-coords'
 assemblytics: 'Assemblytics'
 bedtools: 'bedtools'
+samtools: 'samtools'
 
 
 # optional but highly recommanded:
