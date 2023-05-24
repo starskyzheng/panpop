@@ -47,6 +47,8 @@ my $debug = 0;
 my $min_diff_fold = 5;
 my $enable_norm_alle = 1;
 $out = '-';
+my $mode = 'by_length'; # by_length by_type
+my $force_pav = 0;
 
 sub usage {
     print <<EOF;
@@ -61,6 +63,8 @@ Options:
     --min_lendiff_tomerge  <INT>   min_len_diff_tomerge for BIG allele, 0 for -∞, default: $min_lendiff_tomerge
     --max_diff_fold    <FLOAT> max different length (fold) to merge BIG allele, 1 to disable, default: $max_diff_fold
     --enable_norm_alle <INT>   enable normalize alleles, default: $enable_norm_alle
+    --mode             <STR>   by_length or by_type, default: $mode
+    --force_pav                force convert to PAV, default: False
 EOF
     exit;
 }
@@ -81,6 +85,8 @@ GetOptions (
     'min_lendiff_tomerge=i' => \$min_lendiff_tomerge,
     'max_diff_fold=f' => \$max_diff_fold,
     'debug!' => \$debug,
+    'mode=s' => \$mode,
+    'force_pav!' => \$force_pav,
 );
 
 $max_len_tomerge = 999999999 if $max_len_tomerge == 0;
@@ -142,8 +148,14 @@ sub process_line {
     my @alts = split /,/, $F[4];
     die $line unless @alts;
     my @ref_alts = ($ref, @alts);
-    #my $replace = &gen_replace_by_type($ref, \@alts, \@ref_alts);
-    my $replace = &gen_replace_by_length_only($ref, \@alts, \@ref_alts);
+    my $replace;
+    if($mode eq 'by_length') {
+        $replace = &gen_replace_by_length_only($ref, \@alts, \@ref_alts);
+    } elsif ($mode eq 'by_type') {
+        $replace = &gen_replace_by_type($ref, \@alts, \@ref_alts);
+    } else {
+        die "unknown mode: $mode";
+    }
     #say STDERR Dumper $replace;
     my ($replace2, $newalts) = &gen_replace2($replace, scalar(@ref_alts)-1);
     foreach my $isid (9..$#F) {
@@ -319,15 +331,31 @@ sub gen_replace_by_type {
     my %replace;
     if ($reflen >= $sv_min_dp and $alt_max_len>=$sv_min_dp) {
         # cannot determine type
+        # die "$reflen >= $sv_min_dp and $alt_max_len>=$sv_min_dp";
     } elsif ($reflen <= $sv_min_dp and $alt_max_len<=$sv_min_dp) {
         # cannot determine type
+        # die "$reflen <= $sv_min_dp and $alt_max_len<=$sv_min_dp";
     } elsif ($reflen <= $max_len_tomerge and $alt_max_len >= $sv_min_dp and 
             $reflen*$min_diff_fold <= $alt_max_len) { # ins
         my $max_len_tomerge_now = min($max_len_tomerge, int($alt_max_len/$min_diff_fold));
+        my ($longest_ialt, @ins_ialts);
+        my $longest_ialt_len = 0;
         foreach my $ialt (1..$ref_alts_maxi) {
             my $len = length $$ref_alts[$ialt];
             if ($len <= $max_len_tomerge_now) {
                 $replace{$ialt} = 0 if $ialt != 0;
+            } elsif($force_pav==1) {
+                # force convert to PAV, force convert to only one INS
+                $longest_ialt = $ialt if $len > $longest_ialt_len;
+                push @ins_ialts, $ialt;
+            }
+        }
+        if($force_pav==1) {
+            if (0 ~~ @ins_ialts) {
+                die;
+            }
+            foreach my $ialt (@ins_ialts) {
+                $replace{$ialt} = $longest_ialt if $ialt != $longest_ialt;
             }
         }
     } elsif ($reflen >= $sv_min_dp and $alt_min_len <= $max_len_tomerge and
@@ -344,8 +372,11 @@ sub gen_replace_by_type {
         }
         foreach my $ialt (0..$ref_alts_maxi) {
             my $len = length $$ref_alts[$ialt];
-            if ($len <= $max_len_tomerge_now) {
+            if ($len <= $max_len_tomerge_now) { # del allele
                 $replace{$ialt} = $shortest_ialt if $ialt != $shortest_ialt;
+            } elsif ($force_pav==1) {
+                # force convert to PAV, non-del to REF
+                $replace{$ialt} = 0 if $ialt != 0;
             }
         }
     }
