@@ -302,11 +302,13 @@ sub alt_alts_to_muts {
     my $is_miss=0;
     my $ref_missn=0;
     my $old_sarray=[];
+    my $old_sarray_bak=[];
+    my $status_last = [];
     my $is_ref_miss_at_start=0;
     my ($last_nomiss_pos, $last_nomiss_sarray) = (0, []);
     for (my $i = 0; $i < $aln_seqlen; $i++) {
-        #if(exists $$old_sarray[0] and $$old_sarray[0] eq 'CGGT') {die;}
         #say STDERR $$old_sarray[0] if exists $$old_sarray[0];
+        #$old_sarray_bak = dclone($old_sarray);
         my $sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 1);
         my ($is_same_now, $is_miss_now, $is_ref_miss_now) = &sarray_is_same_miss($sarray, $max_alts);
         say STDERR "!!" . " $i " . ($i-$ref_missn) . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, is_miss$is_miss" if $debug;
@@ -390,6 +392,7 @@ sub alt_alts_to_muts {
                 confess();
             }
         }
+        $status_last = [$is_same_now, $is_miss_now, $is_ref_miss_now, $sarray, $old_sarray_bak];
     }
     if (@$old_sarray and $miss_start>=0) {
         if ( length($$old_sarray[0])==0 ) {
