@@ -42,7 +42,7 @@ my $depth_file;
 ### 1:  only filter all missing site
 ### 0:  only keep none missing site
 ### 0~1:  filter
-my $miss_threshold=1; 
+my $miss_threshold=1;
 
 my($in_vcf, $opt_help);
 my $thread='auto';
@@ -55,6 +55,7 @@ my $dp_max_fold = 3;
 my $mad_min_fold = 0.11;
 my $min_GQ = 0;
 my $remove_fail = 0;
+my $flt_append_only = 0;
 
 my $vcf_header_append = "##flt=$0 @ARGV";
 
@@ -72,6 +73,7 @@ GetOptions (
     'mad_min_abs=i' => \$mad_min_abs,
     'min_GQ=i' => \$min_GQ,
     'remove_fail!' => \$remove_fail,
+    'flt_append_only!' => \$flt_append_only,
 );
 
 
@@ -91,6 +93,7 @@ Options:
     --miss_threshold	Filter site with more than X missing rates. Range from 0 to 1.	default: 1 (not filter)
     --min_GQ			Hard-filter GQ in each sample and each site, default: 0
     --remove_fail       Bool. Whether to remove fail variants. default: false.
+    --flt_append_only   Bool. Only filter if DPSOURCE=append. default: false.
 EOF
     exit;
 }
@@ -244,10 +247,15 @@ sub flt {
     my $DP_num;
     my $GQ_num;
     my $MAD_num;
+    my $DPSOURCE_num;
     my @info=split(/:/,$a[8]);
     for (my $ii=0;$ii<@info;$ii++){
-        if ($info[$ii] eq 'DP'){
-            $DP_num = $ii ;
+        if ($info[$ii] eq 'DP' or $info[$ii] eq 'MDP'){ # MDP: Mean Read Depth
+            if(defined $DP_num) {
+                my @t = ref $DP_num eq 'ARRAY' ? @$DP_num : ($DP_num);
+                $DP_num = [ @t, $ii ];
+            }
+            $DP_num = $ii;
             next;
         } elsif($info[$ii] eq 'GQ'){
             $GQ_num = $ii;
@@ -255,16 +263,15 @@ sub flt {
         } elsif($info[$ii] eq 'MAD'){
             $MAD_num = $ii;
             next;
+        } elsif($flt_append_only==1 and $info[$ii] eq 'DPSOURCE'){
+            $DPSOURCE_num = $ii;
+            next;
         }
     }
     #say STDERR "no DP_num" unless defined $DP_num;
     my $miss=0;
     for (my $i=9;$i<@a;$i++){
         my $id=$idline[$i];
-        #my $iddp_avg=$$dps{$id} // die "dp not in list: $id";
-        #my $mindp = $iddp_avg * $dp_min_fold;
-        #my $maxdp = $iddp_avg * $dp_max_fold;
-        #my $minMAD = $iddp_avg * $mad_min_fold;
         die "dp not in list: $id" unless exists $dps_minmax->{$id};
         my ($mindp, $maxdp, $minMAD) = @{$dps_minmax->{$id}};
         $minMAD = 1 if $minMAD < 1;
@@ -276,7 +283,24 @@ sub flt {
             $all = $all + 2;
             next unless defined $DP_num;
             my @idinfo=split(/:/,$a[$i]);
-            my $iddp=$idinfo[$DP_num] // die "no iddp found: $line";
+            if ($flt_append_only==1) {
+                my $dpsource = $idinfo[$DPSOURCE_num];
+                if($dpsource ne 'append') {
+                    next; # skip filter when flt_append_only==1
+                }
+            }
+            my $iddp;
+            if (ref $DP_num) {
+                my $iddp_max = 0;
+                foreach my $DP_num (@$DP_num) {
+                    my $iddp_now=$idinfo[$DP_num] // die "no iddp found: $line";
+                    $iddp_now=0 if $iddp_now eq '.';
+                    $iddp_max = $iddp_now if $iddp_now > $iddp_max;
+                }
+                $iddp = $iddp_max;
+            } else {
+                $iddp=$idinfo[$DP_num] // die "no iddp found: $line";
+            }
             $iddp=0 if $iddp eq '.';
             if ( $iddp < $mindp || $iddp > $maxdp || 
                 ($min_GQ > 0 and defined $GQ_num and exists $idinfo[$GQ_num] and 
