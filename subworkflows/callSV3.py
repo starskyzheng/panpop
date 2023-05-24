@@ -401,25 +401,29 @@ rule consensus_inv:
         {TABIX} {output.vcf} 2>>{log}
         """
 
-
-def get_consensus_Assemblytics_vcf(wildcards):
+def get_consensus_vcfs_to_merge(wildcards):
     sid = wildcards.sample
     fa = get_assb_fasta(wildcards)
     platform = get_platform(wildcards)
-    vcfs = ["03_vcf/01_sniffles/{}.sniffles.parse.vcf.gz".format(sid),
-                #lambda wildcards: "03_vcf/02_cuteSV/{sample}.{platform}.cuteSV.parse.vcf.gz".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform']),
-                "03_vcf/02_cuteSV/{}.{}.cuteSV.parse.vcf.gz".format(sid, platform),
-                "03_vcf/03_svim/{}/variants.parse.vcf.gz".format(sid),
-                "03_vcf/04_pbsv/{}/pbsv.parse.vcf.gz".format(sid) ]
-    if fa != '-':
+    vcfs = []
+    # is in SV_CALLER_LIST (in lower case)
+    SV_CALLER_LIST_lower = [x.lower() for x in config['SV_CALLER_LIST']]
+    if 'sniffles' in SV_CALLER_LIST_lower:
+        vcfs.append("03_vcf/01_sniffles/{}.sniffles.parse.vcf.gz".format(sid))
+    if 'cutesv' in SV_CALLER_LIST_lower:
+        vcfs.append("03_vcf/02_cuteSV/{}.{}.cuteSV.parse.vcf.gz".format(sid, platform))
+    if 'svim' in SV_CALLER_LIST_lower:
+        vcfs.append("03_vcf/03_svim/{}/variants.parse.vcf.gz".format(sid))
+    if 'pbsv' in SV_CALLER_LIST_lower: 
+        vcfs.append("03_vcf/04_pbsv/{}/pbsv.parse.vcf.gz".format(sid))
+    if 'assemblytics' in SV_CALLER_LIST_lower and fa != '-':
         vcf = "03_vcf/05_Assemblytics/{}/5.parse.vcf.gz".format(sid)
         vcfs.append(vcf)
     return vcfs
 
-
 rule consensus:
     input:
-        get_consensus_Assemblytics_vcf
+        get_consensus_vcfs_to_merge
     output:
         vcf = "04_consensus_vcf/{sample}/01.merged.vcf.gz",
     threads: 4
