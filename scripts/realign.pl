@@ -81,12 +81,14 @@ options:
     -h | --help                    Print this help
     --verb <int>
     --all <bool>                   Print lines even no mutation.
-    --level <BITCODE>              Level &2 will not merge lines. Level &4 will split missing alles.
     --skip_snp <bool>              Skip snp
+    --level <BITCODE>              Level &2 will not merge lines. (Default: $align_level)
+                                   Level &4 will split missing alleles.
+                                   Level &8 will not split any alleles.
 EOF
     exit(1);
 }
-
+&usage() if $opt_help;
 my $ARGVs = join(" ", $0, @ARGV);
 
 GetOptions (
@@ -94,7 +96,7 @@ GetOptions (
         'i|in_vcf=s' => \$infile,
         'o|out_vcf=s' => \$outfile,
         'debug!' => \$debug,
-        'verb=i' => \$verb,
+        'v|verb=i' => \$verb,
         't|threads=i' => \$threads,
         'r|ref_fasta_file=s' => \$ref_fasta_file,
         'aug!' => \$is_aug,
@@ -113,7 +115,7 @@ GetOptions (
 );
 
 
-&usage() if $opt_help or !$infile or !$outfile or !$ref_fasta_file;
+&usage() if !$infile or !$outfile or !$ref_fasta_file;
 
 $tmp_dir = $tmp_dir_def if $tmp_dir eq 'Default';
 if (! -e $tmp_dir) {
@@ -256,7 +258,7 @@ sub check_is_in_mask {
     #die Dumper $mask_bed;
     #say STDERR "$chr $pos $len";
     return 1 if ! defined $mask_bed_file; # not enable mask
-    return 0 if ! exists $mask_bed->{$chr};
+    return -1 if ! exists $mask_bed->{$chr};
     my $end = $pos + $len - 1;
     my $arrays = $mask_bed->{$chr};
     my $array_n = scalar(@$arrays);
@@ -273,11 +275,11 @@ sub check_is_in_mask {
             last;
         }
     }
-    if (@windows_in) {
+    if (@windows_in) { # in mask
         my $min_windowsid = min(@windows_in);
         return $min_windowsid;
-    } else {
-        return 0;
+    } else { # not in mask
+        return -1;
     }
 }
 
@@ -299,6 +301,8 @@ sub zz_mce_producer {
         next if $F[4] eq '';
         my $chr = $F[0];
         my $pos = $F[1];
+        $F[3] = uc($F[3]);
+        $F[4] = uc($F[4]);
         my $ref_seq = $F[3];
         my $reflen = length($ref_seq);
         my @alts = split(/,/, $F[4]);
@@ -371,7 +375,7 @@ sub split_queue_by_mask_bed {
         my $pos = $F[1];
         my $reflen = length($F[3]);
         my $window_id = &check_is_in_mask($chr, $pos, $reflen);
-        if($window_id==0) {
+        if($window_id == -1) { # not in mask
             my $end_real = $pos + $reflen - 1;
             $queue->enqueue( $$iline_, [[$line], $chr, $pos, $end_real] );
             $$iline_++;
@@ -794,6 +798,7 @@ sub thin_alts {
         push $seq2i{$seq}->@*, $i;
         push @new_alts, $seq;
     }
+    #die Dumper \@new_alts;
     my $new_ref = shift @new_alts;
     return(\%remapi, $new_ref, \@new_alts);
 }
@@ -826,7 +831,7 @@ sub read_ref_noaug {
             $$seq_now = '';
             next;
         }
-        $$seq_now .= $_;
+        $$seq_now .= uc($_);
     }
     my $total_length=0;
     my $total_chrs = scalar(keys %ref);
