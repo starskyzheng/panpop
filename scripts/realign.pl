@@ -84,7 +84,7 @@ options:
     --skip_snp <bool>              Skip snp
     --level <BITCODE>              Level &2 will not merge lines. (Default: $align_level)
                                    Level &4 will split missing alleles.
-                                   Level &8 will not split any alleles.
+                                   Level &8 will force not split any alleles.
 EOF
     exit(1);
 }
@@ -452,7 +452,7 @@ sub process_line_new {
         $alt_max_length = $len if $alt_max_length < $len;
         $alt_min_length = $len if $alt_min_length > $len;
     }
-    if ($is_snp==1 or ($force_realign==0 and scalar(@$ref_alts)==2)) { ########## SNP #  or $alt_min_length<=1
+    if ($is_snp==1 or ($force_realign==0 and scalar(@$ref_alts)==2) or $align_level & 8) { ########## SNP #  or $alt_min_length<=1
         my $retline = &gen_lines_before_process($ids2alles, $ref_alts, $chr, $win_start);
         if ($retline) {
             return([$retline])
