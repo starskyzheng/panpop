@@ -87,7 +87,7 @@ rule all:
         expand("04_consensus_vcf/{sample}/09.thin2.sort.vcf.gz", sample=SAMPLE_INDEX),
         expand("04_consensus_vcf/{sample}/00.inv.vcf.gz", sample=SAMPLE_INDEX),
         "05_merge_samples/08.realign0.sorted.vcf.gz",
-        "05_merge_samples/14.thin3.vcf.gz",
+        "05_merge_samples/15.thin3.vcf.gz",
         "05_merge_samples/15.thin3.sv.vcf.gz",
 
 
