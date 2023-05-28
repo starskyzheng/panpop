@@ -167,7 +167,7 @@ sub print_lens {
     my %id2types;
     LINE:foreach my $line_ (@$lines) {
         my @line = split(/\t/, $line_);
-        my $ref = $line[3];
+        my $ref = uc($line[3]);
         die unless defined $ref and $ref;
         #die unless $line[8]=~/^$infos/;
         my ($DP_num, $GQ_num, $MAD_num, $DPSOURCE_num, $MDP_num);
@@ -205,7 +205,7 @@ sub print_lens {
             die "VCF ref error! Please provide a reference fasta file with --ref option.  \n 
                  $ref_len ne $ref $line_.";
         }
-        my @ref_alts = ($ref, split(/,/, $line[4]));
+        my @ref_alts = ($ref, split(/,/, uc($line[4])));
         ID:for(my $idi=9; $idi<=$idi_max; $idi++) {
             #say STDERR "$idi $vcf_header[$idi] " ;
             my @F = split(/:/, $line[$idi]);
