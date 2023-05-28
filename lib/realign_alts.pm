@@ -188,7 +188,7 @@ sub aln_notpipeline {
         $ret[$nonempty_ialt[0]] = $alt_seq;
         foreach my $empty_ialts(@empty_ialt) {
             my $empty_seq = '-' x $alt_seq_len;
-            $ret[$empty_ialts], $empty_seq;
+            $ret[$empty_ialts] = $empty_seq;
         }
         return(0, \@ret);
     }
