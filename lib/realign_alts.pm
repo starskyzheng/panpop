@@ -165,12 +165,36 @@ sub aln_notpipeline {
     my $fasta = $fastafh->filename;
     my $fastaaln = "$fasta.aln";
     my @empty_ialt;
+    my @nonempty_ialt;
     foreach my $ialt(0..$max_alts) {
         my $alt_seq = $$alts[$ialt];
         if($alt_seq eq "" or $alt_seq =~/^[*-]+$/) {
             push @empty_ialt, $ialt;
             next;
+        } else {
+            push @nonempty_ialt, $ialt;
         }
+    }
+    my $nonempty_alts_count = scalar(@nonempty_ialt);
+    if($nonempty_alts_count==0) {
+        # should not happen
+        return(-1, undef);
+    } elsif($nonempty_alts_count==1) {
+        # only one non-empty alt
+        close $fastafh;
+        my $alt_seq = $$alts[$nonempty_ialt[0]];
+        my $alt_seq_len = length($alt_seq);
+        my @ret;
+        $ret[$nonempty_ialt[0]] = $alt_seq;
+        foreach my $empty_ialts(@empty_ialt) {
+            my $empty_seq = '-' x $alt_seq_len;
+            $ret[$empty_ialts], $empty_seq;
+        }
+        return(0, \@ret);
+    }
+    # else: $nonempty_alts_count>1
+    foreach my $ialt(@nonempty_ialt) {
+        my $alt_seq = $$alts[$ialt];
         say $fastafh ">$ialt";
         say $fastafh $alt_seq;
     }
@@ -325,7 +349,7 @@ sub alt_alts_to_muts {
                         #say STDERR Dumper \%muts;
                         $miss_start = $i - $ref_missn;
                         $old_sarray = [];
-                        $is_miss = 0;
+                        $is_miss = 1;
                         $last_nomiss_pos = $i - $ref_missn;
                         $last_nomiss_sarray = $sarray;
                     }
