@@ -367,4 +367,3 @@ dependencies:
   - zlib=1.2.13=h166bdaf_4
   - zstandard=0.19.0=py39h29414ee_1
   - zstd=1.5.2=h3eb15da_6
-prefix: /data/00/user/user101/software/anaconda3/envs/panpop
