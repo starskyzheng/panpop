@@ -151,9 +151,12 @@ if ($threads==1) {
 
 my $lines_cpx_len = scalar(@$lines_cpx);
 if ($lines_cpx_len>0) {
+    my $cpx_i=0;
     say STDERR "Now processing: lines_cpx_len lines: $lines_cpx_len !\n";
     foreach my $line (@$lines_cpx) {
+        $cpx_i++;
         my ($result, $is_cpx) = &prase_line($line, $threads, 1);
+        say STDERR "$cpx_i/$lines_cpx_len" if $cpx_i % 50 == 0;
         say $O $result if $result;
     }
 }
@@ -167,6 +170,11 @@ exit;
 sub flt_mce {
     my ( $mce, $chunk_ref, $chunk_id ) = @_;
     my ($result, $is_cpx) = &prase_line($$chunk_ref[0], 1, $not_use_cpx);
+    if ($chunk_id % 1000==0) {
+        my $cpx_len = $lines_cpx->len();
+        $result=~/^(\S+)\t(\S+)/ or die;;
+        say STDERR "Now: $1:$2 (cpx:$cpx_len)";
+    }
     if ($is_cpx==1) {
         $lines_cpx->push($result);
         $mce->gather($chunk_id);
