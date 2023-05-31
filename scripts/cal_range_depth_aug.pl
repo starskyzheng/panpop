@@ -45,6 +45,7 @@ my ($opt_help);
 my $threads = 1;
 my $min_dp = 3;
 my $input_format = 'vg';
+my $ref_only;
 
 GetOptions (
         'help|h!' => \$opt_help,
@@ -56,6 +57,7 @@ GetOptions (
         'input_format=s' => \$input_format,
         'output_avgdpinfo=s' => \$output_dpinfo,
         'min_dp=i' => \$min_dp,
+        'ref_only!' => \$ref_only,
 );
 &help() if $opt_help;
 &help() unless defined $vcfposs_file and defined $packpg_list_file and defined $outdir;
@@ -223,7 +225,7 @@ sub process_dp {
 
 sub add_dp_summary {
     my ($chr, $buf_all_all, $buf_all_tmp) = @_;
-    if($chr=~/^\d+$/) { # ref
+    if($ref_only==1 or $chr=~/^\d+$/) { # ref
         $$buf_all_all{ref}[0] += $$buf_all_tmp[0];
         $$buf_all_all{ref}[1] += $$buf_all_tmp[1];
     } else { # non-ref
@@ -293,5 +295,6 @@ sub help() {
         --input_format <str>    vg or bam. Default: vg
         --output_avgdpinfo <file>  output avg dpinfo file. Default: not output
         --min_dp <int>          min depth to count. Default: $min_dp
+        --ref_only              Treated all chromsomes as ref, not non-ref
         ";
 }

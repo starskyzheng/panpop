@@ -34,7 +34,7 @@ rule aug_realign0:
         #tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
         {BCFTOOLS} sort -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
@@ -67,7 +67,7 @@ rule cal_aug_dp:
     shell:
         """
         echo '{wildcards.sample} {input.bam}' > {output.list_packpg} && \
-        perl {workflow.basedir}/scripts/cal_range_depth_aug.pl --vcfposs {input.poss} --list_packpg {output.list_packpg} --outdir {params.outdir} --threads {params.realthreads} --input_format bam --output_avgdpinfo {output.avgdp} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/cal_range_depth_aug.pl --vcfposs {input.poss} --list_packpg {output.list_packpg} --outdir {params.outdir} --threads {params.realthreads} --input_format bam --output_avgdpinfo {output.avgdp} --ref_only >> {log} 2>&1
         """
 
 rule fill_aug_dp:
@@ -189,7 +189,7 @@ rule aug_realign0_filldp:
         #tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
         {BCFTOOLS} sort -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
@@ -291,9 +291,42 @@ rule pop_realign3:
         {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
         """
 
-rule pop_thin23:
+
+rule pop_thin31:
     input:
         vcf = "05_merge_samples/14.realign3.sort.vcf.gz",
+    output:
+        vcf = "05_merge_samples/15.thin1.vcf.gz",
+        vcfsorted = "05_merge_samples/15.thin1.sort.vcf.gz"
+    threads: config['cores_realign']
+    log: "logs/5.15.thin1.log"
+    resources:
+        mem_mb = 4000
+    shell:
+        """
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 20 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1 && \
+        {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
+        """
+
+
+rule pop_thin32:
+    input:
+        vcf = "05_merge_samples/15.thin1.sort.vcf.gz",
+    output:
+        vcf = "05_merge_samples/15.thin2.vcf.gz",
+    threads: config['cores_realign']
+    log: "logs/5.15.thin2.log"
+    resources:
+        mem_mb = 4000
+    shell:
+        """
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {input.vcf} --outvcf {output.vcf} --enable_norm_alle 1 --max_len_tomerge 20 --sv_min_dp 30 --threads {threads} >>{log} 2>&1
+        """
+
+
+rule pop_thin33:
+    input:
+        vcf = "05_merge_samples/15.thin2.vcf.gz",
     output:
         vcf = "05_merge_samples/15.thin3.vcf.gz",
     threads: config['cores_realign']
@@ -305,22 +338,42 @@ rule pop_thin23:
         perl {workflow.basedir}/scripts/sv2pav.pl --invcf {input.vcf} --outvcf {output.vcf} --enable_norm_alle 1 --max_len_tomerge 20 --sv_min_dp 30 --threads {threads} --by_type_force_pav --mode by_type >>{log} 2>&1
         """
 
+# rule pop_split_by_type:
+#     input:
+#         vcf = "05_merge_samples/15.thin3.vcf.gz",
+#     output:
+#         vcf_snp = "05_merge_samples/15.thin3.snp.vcf.gz",
+#         vcf_indel = "05_merge_samples/15.thin3.indel.vcf.gz",
+#         vcf_sv = "05_merge_samples/15.thin3.sv.vcf.gz",
+#     threads: config['cores_realign']
+#     log: "logs/5.15.split_by_type.log"
+#     resources:
+#         mem_mb = 1000
+#     params:
+#         outprefix = '05_merge_samples/15.thin3',
+#         min_sv_len = config['SV_min_length']
+#     shell:
+#         """
+#         perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
+#         """
+
 rule pop_split_by_type:
     input:
-        vcf = "05_merge_samples/15.thin3.vcf.gz",
+        vcf = "05_merge_samples/{inprefix}.vcf.gz",
     output:
-        vcf_snp = "05_merge_samples/15.thin3.snp.vcf.gz",
-        vcf_indel = "05_merge_samples/15.thin3.indel.vcf.gz",
-        vcf_sv = "05_merge_samples/15.thin3.sv.vcf.gz",
+        vcf_snp = "05_merge_samples/{inprefix}.snp.vcf.gz",
+        vcf_indel = "05_merge_samples/{inprefix}.indel.vcf.gz",
+        vcf_sv = "05_merge_samples/{inprefix}.sv.vcf.gz",
     threads: config['cores_realign']
-    log: "logs/5.15.split_by_type.log"
+    log: "logs/5.{inprefix}.split_by_type.log"
     resources:
         mem_mb = 1000
     params:
-        outprefix = '05_merge_samples/15.thin3',
+        outprefix = '05_merge_samples/{inprefix}',
         min_sv_len = config['SV_min_length']
     shell:
         """
         perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len} >> {log} 2>&1
         """
+
 
