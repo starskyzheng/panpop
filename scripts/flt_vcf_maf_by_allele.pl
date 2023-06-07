@@ -88,8 +88,10 @@ while(<$I>) {
     }
 }
 
+
 my $max_idi = scalar(@header)-1;
 my $id_count = $max_idi-8;
+my $max_miss_count = $id_count * $max_miss_freq;
 $min_maf = $min_maf * $id_count * 2;
 $min_maf = int($min_maf)+1 if $min_maf != int($min_maf);
 
@@ -182,7 +184,7 @@ sub process_alts_freq {
         push @info_AF, "$newi:$freq";
         $update_ia{$i} = $newi;
     }
-    return undef if $all_not_miss_count < $id_count - $max_miss_freq;
+    return undef if $all_not_miss_count < $id_count - $max_miss_count;
     push @info_AF, "DEL:$del_freq:".scalar(keys %ia_del) if $del_freq;
     my $F7_append = "AF=" . join(',', @info_AF);
     if ($$F[7] eq '.') {
