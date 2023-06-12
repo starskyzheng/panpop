@@ -1,5 +1,9 @@
 import os
-configfile: "config.yaml"
+
+configfile: "configs/software.yaml"
+configfile: "configs/base.yaml"
+configfile: "configs/config.pop2.yaml"
+
 include: "subworkflows/util.py"
 
 # parse config values
@@ -36,11 +40,13 @@ if config['split_chr']==True:
         rule all:
             input:
                 expand('8.aug_realign/6.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+                '9.aug_final_result/1.realign1.final_mergechr.all.sort.vcf.gz', # Augment output SV VCF
                 '9.aug_final_result/1.SV.split.final_mergechr.all.sv.vcf.gz', # Augment output SV VCF
                 '9.aug_final_result/2.SNP.split.final_mergechr.all.snp.vcf.gz', # Augment output SNP VCF
                 '9.aug_final_result/2.SNP.split.final_mergechr.all.indel.vcf.gz', # Augment output InDel VCF
+                '9.aug_final_result/6.filter_maf1.final_mergechr.all.vcf.gz', # Augment output PAV VCF
                 '9.aug_final_result/7.PAV.final_mergechr.all.sv.vcf.gz', # Augment output PAV VCF
-                
+
 elif config['split_chr']==False:
     CHRS=['all']
     if config['mode'] == 'genotype':
@@ -62,7 +68,8 @@ if config['mode'] == 'genotype':
 elif config['mode'] == 'augment':
     include: "subworkflows/panpopbase.py"
     include: "subworkflows/panpopaug.py"
-
+else:
+    raise ValueError('mode must be genotype or augment')
 
 
 for dir in [ZTMPDIR]:

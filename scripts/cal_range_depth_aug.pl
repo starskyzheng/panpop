@@ -37,7 +37,7 @@ use read_config qw/read_config_yaml/;
 
 my $config = read_config_yaml("$Bin/../config.yaml");
 my $vg = $$config{vg};
-my $samtools = $$config{samtools} or die;
+my $samtools = $$config{samtools};
 
 my ($vcfposs_file, $packpg_list_file, $outdir, $need_chr);
 my ($output_dpinfo, $output_dpinfo_fh);
@@ -62,6 +62,12 @@ GetOptions (
 &help() if $opt_help;
 &help() unless defined $vcfposs_file and defined $packpg_list_file and defined $outdir;
 &help("input_format error!") unless $input_format eq 'vg' or $input_format eq 'bam';
+
+if($input_format eq 'vg') {
+    die "no vg path in config" unless defined $vg;
+} elsif ($input_format eq 'bam') {
+    die "no samtools path in config" unless defined $samtools;
+}
 
 $need_chr = undef if defined $need_chr and $need_chr eq 'all';
 if (defined $output_dpinfo) {

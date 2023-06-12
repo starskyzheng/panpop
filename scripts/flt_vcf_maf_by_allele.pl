@@ -153,7 +153,8 @@ sub process_alts_freq {
     my $ref_alts_len_ori = $#ref_alts;
     for(my $i=$ref_alts_len_ori; $i>=1; $i--) { # reverse
         my $freq = $freqs{$i} // 0;
-        if ($freq < $min_maf) {
+        #if ($freq < $min_maf) {
+        if ($freq <= $min_maf) { #### <= freq
             #push @ia_del, $i;
             $ia_del{$i}++;
             splice @ref_alts, $i, 1;
