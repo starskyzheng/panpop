@@ -354,7 +354,7 @@ sub seq2identity {
         confess "???? len not equal: $len1 $len2 @$seqs";
     }
     my $same=0;
-    my $score = 0;
+    #my $score = 0;
     my $lenr1 = 0;
     my $lenr2 = 0;
     my $gap = 0;
@@ -363,24 +363,27 @@ sub seq2identity {
         my $b1 = $s1[$i];
         my $b2 = $s2[$i];
         if ($b1 eq $b2 and $b1 ne '-') { # A/A
-            $score++;
+            #$score++;
             $same++;
+            $lenr1++; $lenr2++;
         } elsif ($b1 ne $b2 and ($b1 eq '-' or $b2 eq '-')) { # A/- or -/A
             $diff_now++;
-            $score -= 0.5;
+            #$score -= 0.5;
             $gap++;
+            $lenr1++ if $b1 ne '-';
+            $lenr2++ if $b2 ne '-';
         } elsif ($b1 eq '-' and $b2 eq '-') { # -/-
             # nothing
+            next;
         } elsif ($b1 ne $b2 and ($b1 ne '-' and $b2 ne '-')) { # A/C
             $diff_now++;
+            $lenr1++; $lenr2++;
             # nothing
         } else {
             confess "???? $b1 $b2";
         }
-        $lenr1++ if $b1 ne '-';
-        $lenr2++ if $b2 ne '-';
-        #return(0, $diff_now, $gap) if $diff_now > $self->{mcl_group_threshold_diff};
-        return(0, $diff_now, $gap) if $gap > $self->{mcl_group_threshold_diff};
+        return(0, $diff_now, $gap) if $diff_now > $self->{mcl_group_threshold_diff};
+        #return(0, $diff_now, $gap) if $gap > $self->{mcl_group_threshold_diff};
     }
     #my $meanlenr = ($lenr1+$lenr2)/2;
     my $mexlenr = $lenr1 > $lenr2 ? $lenr1 : $lenr2; # max

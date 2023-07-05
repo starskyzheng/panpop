@@ -1,7 +1,8 @@
 
 rule merge_samples:
     input:
-        vcfs = expand("04_consensus_vcf/{sample}/09.thin2.sort.vcf.gz", sample=SAMPLE_INDEX),
+        vcfs = expand("04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz", sample=SAMPLE_INDEX),
+        vcf_tbis = expand("04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz.tbi", sample=SAMPLE_INDEX),
         listfile = '05_merge_samples/01.merge_samples.vcfs.list',
     output:
         vcf = '05_merge_samples/01.merge_samples.vcf.gz'
@@ -11,8 +12,7 @@ rule merge_samples:
         mem_mb = 4000
     shell:
         """
-        {BCFTOOLS} merge -m none -l {input.listfile} | {BCFTOOLS} sort | bgzip -c > {output.vcf} && \
-        {TABIX} {output.vcf} >>{log} 2>&1
+        {BCFTOOLS} merge -m none -l {input.listfile} 2>>{log} | {BCFTOOLS} sort 2>>{log} | bgzip -c > {output.vcf}
         """
 
 # Realign
@@ -21,8 +21,7 @@ rule aug_realign0:
         vcf = '05_merge_samples/01.merge_samples.vcf.gz',
         ref_fasta_file = INDEX_REF
     output:
-        vcf = '05_merge_samples/02.realign0.vcf.gz',
-        vcf_sorted = '05_merge_samples/02.realign0.sorted.vcf.gz',
+        vcf = '05_merge_samples/02.realign0.unsorted.vcf.gz',
     log:
         'logs/5.02.realign1.vcf.gz.log'
     threads: config['cores_realign']
@@ -35,11 +34,10 @@ rule aug_realign0:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
-        {BCFTOOLS} sort -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 rule vcf2poss:
-    input: '05_merge_samples/02.realign0.vcf.gz',
+    input: '05_merge_samples/02.realign0.sorted.vcf.gz',
     output: '05_merge_samples/03.vcf2pos.tsv', # 1-based
     log:  'logs/5.03.vcf2poss.log',
     threads: 1
@@ -51,8 +49,8 @@ rule vcf2poss:
 rule cal_aug_dp:
     input:
         poss = '05_merge_samples/03.vcf2pos.tsv',
-	bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards)),
-        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards))
+	    bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
         list_packpg = '05_merge_samples/04.dps/{sample}.list_packpg',
         dpfile = '05_merge_samples/04.dps/{sample}.depth.txt.gz',
@@ -72,13 +70,11 @@ rule cal_aug_dp:
 
 rule fill_aug_dp:
     input:
-        vcf = '04_consensus_vcf/{sample}/09.thin2.sort.vcf.gz',
+        vcf = '04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz',
         dpfile = '05_merge_samples/04.dps/{sample}.depth.txt.gz',
         ref = INDEX_REF,
     output:
-        vcf = '05_merge_samples/05.fill_aug_dp/{sample}.vcf.gz',
-        vcf_sorted = '05_merge_samples/05.fill_aug_dp/{sample}.sorted.vcf.gz',
-        vcf_sortedtbi = '05_merge_samples/05.fill_aug_dp/{sample}.sorted.vcf.gz.tbi',
+        vcf = '05_merge_samples/05.fill_aug_dp/{sample}.unsorted.vcf.gz',
     log: 'logs/5.05.fill_aug_dp.{sample}.log',
     threads: 1,
     resources:
@@ -88,9 +84,7 @@ rule fill_aug_dp:
         min_cov = config['aug_nonmut_min_cov'],
     shell:
         """
-        perl {workflow.basedir}/scripts/cal_range_depth_aug.fillvcf.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref {input.ref} --min_cov {params.min_cov} --min_dp {params.min_dp} --dp_file {input.dpfile} >> {log} 2>&1 && \
-        {BCFTOOLS} sort -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1 && \
-        {TABIX} {output.vcf_sorted} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/cal_range_depth_aug.fillvcf.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref {input.ref} --min_cov {params.min_cov} --min_dp {params.min_dp} --dp_file {input.dpfile} >> {log} 2>&1
         """
 
 
@@ -136,6 +130,7 @@ rule merge_samples_genlist_filldp:
 rule merge_samples_filldp:
     input:
         vcfs = expand("05_merge_samples/05.fill_aug_dp/{sample}.sorted.vcf.gz", sample=SAMPLE_INDEX),
+        vcf_tbis = expand("05_merge_samples/05.fill_aug_dp/{sample}.sorted.vcf.gz.tbi", sample=SAMPLE_INDEX),
         listfile = '05_merge_samples/06.merge_samples.vcfs.list',
     output:
         vcf = '05_merge_samples/06.merge_samples.vcf.gz'
@@ -145,8 +140,7 @@ rule merge_samples_filldp:
         mem_mb = 4000
     shell:
         """
-        {BCFTOOLS} merge -m none -l {input.listfile} | {BCFTOOLS} sort | bgzip -c > {output.vcf} && \
-        {TABIX} {output.vcf} >>{log} 2>&1
+        {BCFTOOLS} merge -m none -l {input.listfile} 2>>{log} | {BCFTOOLS} sort 2>>{log} | bgzip -c > {output.vcf}
         """
 
 
@@ -176,8 +170,7 @@ rule aug_realign0_filldp:
         vcf = '05_merge_samples/07.filter_raw_vcf_by_depth.vcf.gz',
         ref_fasta_file = INDEX_REF
     output:
-        vcf = '05_merge_samples/08.realign0.vcf.gz',
-        vcf_sorted = '05_merge_samples/08.realign0.sorted.vcf.gz',
+        vcf = '05_merge_samples/08.realign0.unsorted.vcf.gz',
     log:
         'logs/5.08.realign1.vcf.gz.log'
     threads: config['cores_realign']
@@ -190,7 +183,6 @@ rule aug_realign0_filldp:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
-        {BCFTOOLS} sort -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 
@@ -199,7 +191,7 @@ rule pop_thin11:
     input:
         vcf = "05_merge_samples/08.realign0.sorted.vcf.gz",
     output:
-        vcf = "05_merge_samples/09.thin1.vcf.gz"
+        vcf = "05_merge_samples/09.thin1.unsorted.vcf.gz"
     threads: config['cores_realign']
     resources:
         mem_mb = 10000
@@ -212,7 +204,7 @@ rule pop_thin11:
 # perl {workflow.basedir}/scripts/sv2pav.pl --invcf 7.thin1.vcf.gz --outvcf 7.thin2.vcf.gz --max_len_tomerge 5 --sv_min_dp 50
 rule pop_thin12:
     input:
-        vcf = "05_merge_samples/09.thin1.vcf.gz",
+        vcf = "05_merge_samples/09.thin1.sorted.vcf.gz",
     output:
         vcf = "05_merge_samples/10.thin2.vcf.gz"
     threads: config['cores_realign']
@@ -230,88 +222,78 @@ rule pop_realign2:
         vcf = "05_merge_samples/10.thin2.vcf.gz",
         ref = INDEX_REF
     output:
-        vcf = "05_merge_samples/11.realign2.vcf.gz",
-        vcfsorted = "05_merge_samples/11.realign2.sort.vcf.gz",
+        vcf = "05_merge_samples/11.realign2.unsorted.vcf.gz",
     threads: config['cores_realign']
     log: "logs/5.11.realign2.log"
     resources:
         mem_mb = 20000
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1 && \
-        {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1
         """
 
 rule pop_thin21:
     input:
-        vcf = "05_merge_samples/11.realign2.sort.vcf.gz",
+        vcf = "05_merge_samples/11.realign2.sorted.vcf.gz",
     output:
-        vcf = "05_merge_samples/12.thin1.vcf.gz",
-        vcfsorted = "05_merge_samples/12.thin1.sort.vcf.gz",
+        vcf = "05_merge_samples/12.thin1.unsorted.vcf.gz",
     threads: config['cores_realign']
     log: "logs/5.12.thin1.log"
     resources:
         mem_mb = 10000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 20 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1 && \
-        {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 20 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1
         """
     
 rule pop_thin22:
     input:
-        vcf = "05_merge_samples/12.thin1.sort.vcf.gz",
+        vcf = "05_merge_samples/12.thin1.sorted.vcf.gz",
     output:
         vcf = "05_merge_samples/13.thin2.vcf.gz",
-        vcfsorted = "05_merge_samples/13.thin2.sort.vcf.gz"
     threads: config['cores_realign']
     log: "logs/5.13.thin2.log"
     resources:
         mem_mb = 4000
     shell:
         """
-        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {input.vcf} --outvcf {output.vcf} --enable_norm_alle 1 --max_len_tomerge 20 --sv_min_dp 30 --threads {threads} >>{log} 2>&1 && \
-        {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {input.vcf} --outvcf {output.vcf} --enable_norm_alle 1 --max_len_tomerge 20 --sv_min_dp 30 --threads {threads} >>{log} 2>&1
         """
 
 rule pop_realign3:
     input:
-        vcf = "05_merge_samples/13.thin2.sort.vcf.gz",
+        vcf = "05_merge_samples/13.thin2.vcf.gz",
         ref = INDEX_REF
     output:
-        vcf = "05_merge_samples/14.realign3.vcf.gz",
-        vcfsorted = "05_merge_samples/14.realign3.sort.vcf.gz",
+        vcf = "05_merge_samples/14.realign3.unsorted.vcf.gz",
     threads: config['cores_realign']
     log: "logs/5.14.realign3.log"
     resources:
         mem_mb = 20000
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 6 --skip_mut_at_same_pos 2 --not_use_merge_alle_afterall 0 >>{log} 2>&1 && \
-        {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 6 --skip_mut_at_same_pos 2 --not_use_merge_alle_afterall 0 >>{log} 2>&1
         """
 
 
 rule pop_thin31:
     input:
-        vcf = "05_merge_samples/14.realign3.sort.vcf.gz",
+        vcf = "05_merge_samples/14.realign3.sorted.vcf.gz",
     output:
-        vcf = "05_merge_samples/15.thin1.vcf.gz",
-        vcfsorted = "05_merge_samples/15.thin1.sort.vcf.gz"
+        vcf = "05_merge_samples/15.thin1.unsorted.vcf.gz",
     threads: config['cores_realign']
     log: "logs/5.15.thin1.log"
     resources:
         mem_mb = 4000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 20 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1 && \
-        {BCFTOOLS} sort -O z -o {output.vcfsorted} {output.vcf} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 20 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1
         """
 
 
 rule pop_thin32:
     input:
-        vcf = "05_merge_samples/15.thin1.sort.vcf.gz",
+        vcf = "05_merge_samples/15.thin1.sorted.vcf.gz",
     output:
         vcf = "05_merge_samples/15.thin2.vcf.gz",
     threads: config['cores_realign']

@@ -25,8 +25,7 @@ rule aug_realign0:
         vcf = '3.merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '4.realign/1.realign1.{chrm}.vcf.gz',
-        vcf_sorted = '4.realign/1.realign1.{chrm}.sorted.vcf.gz',
+        vcf = '4.realign/1.realign1.{chrm}.unsorted.vcf.gz',
     log:
         'logs/4.1.realign1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -39,7 +38,6 @@ rule aug_realign0:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 4 >> {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 
@@ -81,9 +79,7 @@ rule merge_dp_vcf:
         vcf = getvcf_aug,
         ref = GRAPH + '.gfa.fa',
     output:
-        vcf = '6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.vcf.gz',
-        vcf_sorted = '6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.sort.vcf.gz',
-        vcf_sortedtbi = '6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.sort.vcf.gz.tbi',
+        vcf = '6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.unsorted.vcf.gz',
     params:
         min_dp = config['aug_nomut_min_dp'],
         min_cov = config['aug_nonmut_min_cov'],
@@ -93,9 +89,7 @@ rule merge_dp_vcf:
         mem_mb=config['mem_aug_filldp']
     shell:
         """
-        perl {workflow.basedir}/scripts/cal_range_depth_aug.fillvcf.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref {input.ref} --min_dp {params.min_dp} --min_cov {params.min_cov} --chr {wildcards.chrm} --dp_file {input.dpfile} >> {log} 2>&1 && \
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1 && \
-        {TABIX} {output.vcf_sorted}
+        perl {workflow.basedir}/scripts/cal_range_depth_aug.fillvcf.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref {input.ref} --min_dp {params.min_dp} --min_cov {params.min_cov} --chr {wildcards.chrm} --dp_file {input.dpfile} >> {log} 2>&1
         """
 
 
@@ -132,7 +126,7 @@ rule aug_merge_dp2_infos:
 
 rule aug_merge_rawvcfs_gen_list:
     input:
-        vcfs = expand('6.aug_dp/3.vcf_with_dp.{{chrm}}/{sample}.sort.vcf.gz', sample=SAMPLES),
+        vcfs = expand('6.aug_dp/3.vcf_with_dp.{{chrm}}/{sample}.sorted.vcf.gz', sample=SAMPLES),
     output:
         outfile = '7.aug_merge_rawvcf/1.inputvcfs.{chrm}.list',
     run:
@@ -195,8 +189,7 @@ rule aug_realign1:
         vcf = '7.aug_merge_rawvcf/4.filter_raw_vcf.{chrm}.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '8.aug_realign/1.realign1.{chrm}.vcf.gz',
-        vcf_sorted = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz',
+        vcf = '8.aug_realign/1.realign1.{chrm}.unsorted.vcf.gz',
     log:
         'logs/8.1.realign1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -208,8 +201,7 @@ rule aug_realign1:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  >> {log} 2>&1 && \
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir}  >> {log} 2>&1
         """
 
 
@@ -235,8 +227,7 @@ rule aug_realign2:
         vcf = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '8.aug_realign/2.realign2.{chrm}.vcf.gz',
-        vcf_sorted = '8.aug_realign/2.realign2.{chrm}.sorted.vcf.gz',
+        vcf = '8.aug_realign/2.realign2.{chrm}.unsorted.vcf.gz',
     log:
         'logs/8.2.realign2.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -248,8 +239,7 @@ rule aug_realign2:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 6 >> {log} 2>&1 && \
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 6 >> {log} 2>&1
         """
 
 
@@ -274,9 +264,8 @@ rule aug_thin_complexVCF:
     input:
         vcf = '8.aug_realign/1.realign1.{chrm}.sorted.vcf.gz'
     output:
-        vcf1 = '8.aug_realign/3.thin1.{chrm}.vcf.gz',
-        vcf2 = '8.aug_realign/3.thin2.{chrm}.vcf.gz',
-        vcf2_sorted = '8.aug_realign/3.thin2.{chrm}.sorted.vcf.gz'
+        vcf1 = '8.aug_realign/3.thin1.{chrm}.unsorted.vcf.gz',
+        vcf2 = '8.aug_realign/3.thin2.{chrm}.unsorted.vcf.gz',
     log:
         'logs/8.3.aug_thin_complexVCF.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -289,8 +278,7 @@ rule aug_thin_complexVCF:
     shell:
         """
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >> {log} 2>&1 && \
-        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --threads {threads} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} >> {log} 2>&1 && \
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf2_sorted} -O z {output.vcf2} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --threads {threads} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} >> {log} 2>&1
         """
 
 rule aug_thin1_realign2:
@@ -298,8 +286,7 @@ rule aug_thin1_realign2:
         vcf = '8.aug_realign/3.thin2.{chrm}.sorted.vcf.gz',
         ref_fasta_file = GRAPH + '.gfa.fa'
     output:
-        vcf = '8.aug_realign/4.realign1.{chrm}.vcf.gz',
-        vcf_sorted = '8.aug_realign/4.realign1.{chrm}.sorted.vcf.gz',
+        vcf = '8.aug_realign/4.realign1.{chrm}.unsorted.vcf.gz',
     log:
         'logs/8.4.realign1.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -312,16 +299,14 @@ rule aug_thin1_realign2:
     shell:
         """
         perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 1 >> {log} 2>&1
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf_sorted} -O z {output.vcf} >> {log} 2>&1
         """
 
 rule aug_thin2_complexVCF:
     input:
         vcf = '8.aug_realign/4.realign1.{chrm}.sorted.vcf.gz'
     output:
-        vcf1 = '8.aug_realign/5.thin1.{chrm}.vcf.gz',
-        vcf2 = '8.aug_realign/5.thin2.{chrm}.vcf.gz',
-        vcf2_sorted = '8.aug_realign/5.thin2.{chrm}.sorted.vcf.gz'
+        vcf1 = '8.aug_realign/5.thin1.{chrm}.unsorted.vcf.gz',
+        vcf2 = '8.aug_realign/5.thin2.{chrm}.unsorted.vcf.gz',
     log:
         'logs/8.5.aug_thin2_complexVCF.{chrm}.vcf.gz.log'
     threads: config['cores_realign']
@@ -334,8 +319,7 @@ rule aug_thin2_complexVCF:
     shell:
         """
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >> {log} 2>&1 && \
-        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --threads {threads} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} >> {log} 2>&1 && \
-        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf2_sorted} -O z {output.vcf2} >> {log} 2>&1
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --threads {threads} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} >> {log} 2>&1
         """
 
 
@@ -405,6 +389,7 @@ rule aug_merge_vcf_splitchrs:
 rule aug_merge_vcf_splitchrs2:
     input:
         vcfs = expand('8.aug_realign/{{prefix}}.{chrm}.{{prefix1}}.vcf.gz', chrm=CHRS),
+        tbis = expand('8.aug_realign/{{prefix}}.{chrm}.{{prefix1}}.vcf.gz.tbi', chrm=CHRS),
     output:
         vcf = '9.aug_final_result/{prefix}.final_mergechr.all.{prefix1}.vcf.gz'
     threads:

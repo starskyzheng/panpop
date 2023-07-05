@@ -108,3 +108,29 @@ def rgfa2chrs(rgfa_file):
                 f.write(chr_now)
                 f.write('\n')
         return(chrs)
+
+
+
+rule sort_vcf:
+    input:
+        vcf = '{dir_now}/{filename}.unsorted.vcf.gz'
+    output:
+        vcf = '{dir_now}/{filename}.sorted.vcf.gz'
+    wildcard_constraints:
+        dir_now='^[01234678].+'
+    threads: 1
+    shell:
+        """
+        {BCFTOOLS} sort --temp-dir {ZTMPDIR}/ -o {output.vcf} -O z {input.vcf}
+        """
+
+rule sort_vcf_tbi:
+    input:
+        vcf = '{dir}/{filename}.vcf.gz'
+    output:
+        vcf = '{dir}/{filename}.vcf.gz.tbi'
+    threads: 1
+    shell:
+        """
+        tabix {input.vcf}
+        """

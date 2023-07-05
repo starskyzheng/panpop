@@ -19,4 +19,6 @@ MIN_SUPPORT_CALLER: 2
 # SV caller list to be used. Default is all 5 SV callers. Options: [sniffles, cuteSV, svim, pbsv, Assemblytics]
 SV_CALLER_LIST: [sniffles, cuteSV, svim, pbsv, Assemblytics]
 
+# Long reads mapper. Options: [minimap2, ngmlr]
+MAPPER: 'minimap2'
 

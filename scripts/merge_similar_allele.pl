@@ -203,8 +203,18 @@ sub prase_line {
     # * to -
     @ref_alts = map { s/^\*$//g; $_ } map { s/^-$//g; $_ } @ref_alts;
     my $max_refaltsi = scalar(@ref_alts)-1;
-    if($force_cpx==0 and $max_refaltsi==1) {
-        return($line, 0);
+    if($max_refaltsi==1) {
+        # biallic
+        my $reflen = length($ref);
+        my $altlen = length($alts[0]);
+        my $lendiff = abs($reflen-$altlen);
+        if($reflen<=3 and $altlen<=3){ # SNP / very small indel
+            return($line, 0);
+        }elsif($lendiff > $mcl_group_threshold_diff) { # too big diff
+            return($line, 0);
+        } elsif ( $lendiff > max($reflen, $altlen)*$mcl_group_threshold_identity ) { # too big diff
+            return($line, 0);
+        }
     }
     if ($force_cpx==0 and $max_refaltsi >= $max_refalts_threshold) {
         say STDERR "Too much alleles at $F[0]:$F[1] ($max_refaltsi)! push to lines_cpx" if $debug==1;
@@ -384,7 +394,7 @@ sub run_get_identity_halign_pair {
     #say STDERR "$identity";
     if ($identity > $mcl_group_threshold_identity and $diff < $mcl_group_threshold_diff) {
         $mutex->lock() if $mutex;
-        $obj->addpair($id1, $id2, $identity); # 多线程会出错
+        $obj->addpair($id1, $id2, $identity);
         $mutex->unlock() if $mutex;
     }
     return;
