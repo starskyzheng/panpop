@@ -6,7 +6,8 @@ def get_assb_fasta(wildcards):
         #fa = S2T.iloc[S2T.index==sid, :].values[0][1]
         fa = S2T.loc[sid, 'AssmbFasta']
     except:
-        1
+        fa = '-'
+    #print("get_assb_fasta::: {} : {}".format(sid, fa), file=sys.stderr)
     if fa == '-':
         return '-'
     else:
@@ -65,6 +66,33 @@ def get_ngmlr_parms(wildcards):
         print("Error! platform error: {}".format(platform))
         1
 
+def get_minimap2_parms(wildcards):
+    platform = wildcards.platform
+    if platform == 'ont':
+        return " -ax map-ont "
+    elif platform == 'pb':
+        return " -ax map-pb "
+    elif platform == 'hifi':
+        return " -ax map-hifi "
+    else:
+        print("Error! platform error: {}".format(platform))
+        1
+
+rule minimap2_alignment:
+    input:
+        reads = "01_raw_data/{sample}.{platform}.fq.gz",
+        ref = INDEX_REF
+    output:
+        "02_bam/{sample}.{platform}.minimap2.bam"
+    threads: config['cores_ngmlr_map']
+    resources:
+        mem_mb = config['mem_ngmlr_map'],
+    log: "logs/1.{sample}.minimap2.{platform}.log"
+    params:
+        extra_parm = lambda wildcards: get_minimap2_parms(wildcards)
+    shell:
+        "{MINIMAP2} {params.extra_parm} --MD -Y -t {threads} {input.ref} {input.reads} 2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}"
+
 rule ngmlr_alignment:
     input:
         reads = "01_raw_data/{sample}.{platform}.fq.gz",
@@ -84,9 +112,9 @@ rule ngmlr_alignment:
 
 rule sort_bam:
     input:
-        lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.bam".format(sample=wildcards.sample, platform=get_platform(wildcards))
+        lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
-        "02_bam/{sample}.{platform}.ngmlr.sort.bam"
+        "02_bam/{sample}.{platform}.{mapper}.sort.bam"
     threads: 10
     resources:
         mem_mb = 10000
@@ -95,11 +123,10 @@ rule sort_bam:
 
 rule index:
     input:
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam"
-        lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards))
-        
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam"
+        lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
-        "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
+        "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai"
     threads: 1
     resources:
         mem_mb = 1000
@@ -108,10 +135,10 @@ rule index:
 
 rule sniffles_call:
     input:
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam",
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
-        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards)),
-        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards))
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam",
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam.bai"
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
         vcf = "03_vcf/01_sniffles/{sample}.sniffles.vcf"
     threads: config['cores_sv3_call']
@@ -137,8 +164,8 @@ def get_cuteSV_call_parms(wildcards):
 
 rule cuteSV_call:
     input:
-        bam = "02_bam/{sample}.{platform}.ngmlr.sort.bam",
-        bai = "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format( sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
         "03_vcf/02_cuteSV/{sample}.{platform}.cuteSV.vcf"
     threads: config['cores_sv3_call']
@@ -159,10 +186,10 @@ rule cuteSV_call:
 
 rule svim_call:
     input:
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam",
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
-        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform']),
-        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform'])
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam",
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam.bai"
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform'], mapper=MAPPER),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format(sample=wildcards.sample, platform=S2T.loc[wildcards.sample, 'platform'], mapper=MAPPER)
     output:
         vcf1 = "03_vcf/03_svim/{sample}/variants.vcf",
         vcf2 = "03_vcf/03_svim/{sample}/pre-variants.vcf"
@@ -181,10 +208,10 @@ rule svim_call:
 
 rule pbsv_align:
     input:
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam",
-        #"02_bam/{sample}.{platform}.ngmlr.sort.bam.bai"
-        bam = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards)),
-        bai = lambda wildcards: "02_bam/{sample}.{platform}.ngmlr.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards))
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam",
+        #"02_bam/{sample}.{platform}.{mapper}.sort.bam.bai"
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
         "02_bam/{sample}.pbsv.sort.bam",
     threads: 1
@@ -198,13 +225,18 @@ rule pbsv_discovery:
     input:
         "02_bam/{sample}.pbsv.sort.bam"
     output:
-        "03_vcf/04_pbsv/{sample}/pbsv.svsig.gz"
+        outfile="03_vcf/04_pbsv/{sample}/pbsv.svsig.gz",
     threads: 1
+    params:
+        outdir="03_vcf/04_pbsv/{sample}"
     log: "logs/2.{sample}.pbsv.2.pbsv_discover.log"
     resources:
         mem_mb = config['mem_sv3_call']
     shell:
-        "{PBSV} discover {input} {output} 2>>{log}"
+        """
+        mkdir -p {params.outdir}
+        {PBSV} discover {input} {output.outfile} 2>>{log}
+        """
 
 
 rule pbsv_call:
@@ -364,20 +396,6 @@ rule cal_genome_txt:
                 print(chr_now, chrlen[chr_now], sep='\t', file=f)
         
 
-# rule sort_vcf:
-#     input:
-#         vcf = "{filepath}.vcf.gz"
-#     output:
-#         vcf = "{filepath}.sort.vcf.gz"
-#     threads: 1
-#     resources:
-#         mem_mb = 4000
-#     shell:
-#         """
-#         {BCFTOOLS} sort -O z -o {output.vcf} {input.vcf}
-#         tabix {output.vcf}
-#         """
-
 rule consensus_inv:
     input:
         #genome = INDEX_REF + ".genome",
@@ -388,7 +406,6 @@ rule consensus_inv:
         bed4 = "03_vcf/04_pbsv/{sample}/pbsv.parse.inv.bed",
     output:
         vcf = "04_consensus_vcf/{sample}/00.inv.vcf.gz",
-        vcftbi = "04_consensus_vcf/{sample}/00.inv.vcf.gz.tbi",
     threads: 1
     log: "logs/3.00.{sample}.consensus_inv.log"
     params:
@@ -398,7 +415,6 @@ rule consensus_inv:
     shell:
         """
         perl {workflow.basedir}/scripts/long_inv_bed2vcf.pl --ref {input.ref} --out {output.vcf} --sample {params.sample} {input.bed1} {input.bed2} {input.bed3} {input.bed4} >>{log} 2>&1
-        {TABIX} {output.vcf} 2>>{log}
         """
 
 def get_consensus_vcfs_to_merge(wildcards):
