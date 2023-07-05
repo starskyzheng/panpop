@@ -218,7 +218,11 @@ LINE:while(<$I>) { # vcf
             if ($F[4] eq '<INS>') {
                 my $ins_seq = &svim_ins_cal_seq(\@F);
                 if (! defined $ins_seq) {
-                    die;
+                    say STDERR "========================";
+                    say STDERR "========================";
+                    say STDERR "Error: No ins_seq: svim_ins_cal_seq error";
+                    say STDERR "================== Line: $.";
+                    die "@F";
                 }
                 $F[4] = $ins_seq;
                 &Update_ref_alt(\@F, 'INS');
