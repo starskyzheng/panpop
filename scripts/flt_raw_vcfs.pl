@@ -197,12 +197,14 @@ sub cal_min_max_dp {
         if($min_dp < $dp_min_abs) {
             $min_dp = $dp_min_abs;
         }
+        $min_dp=1 if $min_dp<=0;
         # min_mad 去尾
         my $min_mad = $dp * $mad_min_fold;
         $min_mad = int($min_mad); 
         if($min_mad < $mad_min_abs) {
             $min_mad = $mad_min_abs;
         }
+        $min_mad=1 if $min_mad<=0;
         # max_dp 进一
         my $max_dp = $dp * $dp_max_fold;
         $max_dp = int($max_dp)+1 if $max_dp > int($max_dp); 
