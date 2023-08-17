@@ -73,6 +73,7 @@ my %ALN_PARAMS;
 my $init = 0;
 my $force_realign = 0;
 my $not_use_merge_alle_afterall = 0;
+my $allow_ext_bp_append;
 
 sub init {
     return if $init == 1;
@@ -84,6 +85,7 @@ sub init {
     $debug = $main::debug // confess "debug not defined";
     $align_level = $main::align_level // 1;
     $force_realign = $main::force_realign // 0;
+    $allow_ext_bp_append = $main::allow_ext_bp_append // 0;
     $not_use_merge_alle_afterall = $main::not_use_merge_alle_afterall // 0;
     foreach my $refs ([$HAlignC, 'stmsa'], 
                       [$muscle3, 'muscle3'],
@@ -295,7 +297,7 @@ sub process_alts_aln_only {
 
 
 sub process_alts {
-    my ($alts, $max_alts, $alt_max_length, $force_aln_method) = @_;
+    my ($alts, $max_alts, $alt_max_length, $force_aln_method, $ext_1bp) = @_;
     if($force_realign==0 and $max_alts==1) { # biallic, to skip calculation
         my %ret = (0=>$alts);
         return(\%ret, length($$alts[0]));
@@ -303,7 +305,7 @@ sub process_alts {
     say STDERR "Ori no align alts: " . Dumper $alts if $debug;
     my $aln_alts = &process_alts_aln_only($alts, $max_alts, $alt_max_length, $force_aln_method);
     say STDERR "alignd alts: " . Dumper($aln_alts) if $debug;
-    my ($muts, $aln_seqlen) = &alt_alts_to_muts($aln_alts, $max_alts);
+    my ($muts, $aln_seqlen) = &alt_alts_to_muts($aln_alts, $max_alts, $ext_1bp);
     return($muts, $aln_seqlen);
 }
 
@@ -311,7 +313,7 @@ sub process_alts {
 
 sub alt_alts_to_muts {
     # $mut{ipos}[ialt] = seq
-    my ($alts, $max_alts) = @_; # aln_alts
+    my ($alts, $max_alts, $ext_1bp) = @_; # aln_alts
     #say STDERR Dumper $alts;
     my @tie_seqs;
     my %muts;
@@ -330,9 +332,19 @@ sub alt_alts_to_muts {
     my $status_last = [];
     my $is_ref_miss_at_start=0;
     my ($last_nomiss_pos, $last_nomiss_sarray) = (0, []);
+    my ($is_ext_1bp, $ext_1bp_before_sarray, $ext_1bp_after_sarray);
+    my $is_ext_1bp_before=0;
+    if(defined $ext_1bp and scalar(@$ext_1bp)==2) {
+        $is_ext_1bp = 1;
+        my ($ext_1bp_before_bp, $ext_1bp_after_bp) = @$ext_1bp;
+        $ext_1bp_before_sarray = [ ($ext_1bp_before_bp) x (1+$max_alts) ];
+        $ext_1bp_after_sarray = [ ($ext_1bp_after_bp) x (1+$max_alts) ];
+    } else {
+        $is_ext_1bp = 0;
+    }
     for (my $i = 0; $i < $aln_seqlen; $i++) {
         #say STDERR $$old_sarray[0] if exists $$old_sarray[0];
-        #$old_sarray_bak = dclone($old_sarray);
+        $old_sarray_bak = dclone($old_sarray);
         my $sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 1);
         my ($is_same_now, $is_miss_now, $is_ref_miss_now) = &sarray_is_same_miss($sarray, $max_alts);
         say STDERR "!!" . " $i " . ($i-$ref_missn) . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, is_miss$is_miss" if $debug;
@@ -352,6 +364,33 @@ sub alt_alts_to_muts {
                         $is_miss = 1;
                         $last_nomiss_pos = $i - $ref_missn;
                         $last_nomiss_sarray = $sarray;
+                    } elsif ($diff_is_same==0 and length($$old_sarray[0])>0 and 
+                            $is_ref_miss_now==1 and $status_last->[2]==0) {
+                        # not compatible, end missing. then start new missing
+                        # ref start miss 
+                        my $old_old_sarray = $status_last->[4];
+                        if(defined $old_old_sarray and @$old_old_sarray) {
+                            # avoid ref start with missing
+                            my $old_sarray_now = $status_last->[3];
+                            my $old_miss_start = $status_last->[5];
+                            my $old_ref_missn = $status_last->[6];
+                            die if exists $muts{$old_miss_start};
+                            if($$old_old_sarray[0] eq '') {
+                                &append_sarray($ext_1bp_before_sarray, $old_old_sarray);
+                                $muts{$old_miss_start-1} = $ext_1bp_before_sarray;
+                                $is_ext_1bp_before++;
+                                $miss_start = $i - $ref_missn;
+                            } else {
+                                $muts{$old_miss_start} = $old_old_sarray;
+                                $miss_start = $i - $ref_missn-1;
+                            }
+                            $old_sarray = [];
+                            &append_sarray($old_sarray, $old_sarray_now);
+                            &append_sarray($old_sarray, $sarray);
+                            $is_miss = 1;
+                            $last_nomiss_pos = $i - $old_ref_missn;
+                            # update status_last
+                        }
                     }
                 }
                 &append_sarray($old_sarray, $sarray);
@@ -416,22 +455,24 @@ sub alt_alts_to_muts {
                 confess();
             }
         }
-        $status_last = [$is_same_now, $is_miss_now, $is_ref_miss_now, $sarray, $old_sarray_bak];
+        $status_last = [$is_same_now, $is_miss_now, $is_ref_miss_now, $sarray, $old_sarray_bak, $miss_start, $ref_missn];
+        #                    0              1           2               3             4             5             6
     }
     if (@$old_sarray and $miss_start>=0) {
         if ( length($$old_sarray[0])==0 ) {
-            # 最后一个SV的ref是空的，将序列补到倒数第二个上
-            my $last_pos_start = max(keys %muts);
-            if (! defined $last_pos_start) {
-                ($last_nomiss_pos, $last_nomiss_sarray) = (undef, undef);
-                if (defined $last_nomiss_pos) {
-                    &append_sarray($last_nomiss_sarray , $old_sarray);
-                    $muts{$last_nomiss_pos} = $last_nomiss_sarray;
-                } else {
-                    confess "last_pos_start is undef @$old_sarray";
+            # 最后一个SV的ref是空的
+            if(!defined $ext_1bp_after_sarray) {
+                # 将序列补到倒数第二个上
+                my $last_pos_start = max(keys %muts);
+                if (! defined $last_pos_start) {
+                    confess "last_pos_start not defined";
                 }
+                &append_sarray($muts{$last_pos_start}, $old_sarray);
+            } else {
+                # ext 1 base in the end
+                # ext_1bp
+                &append_sarray( $old_sarray, $ext_1bp_after_sarray);
             }
-            &append_sarray( $muts{$last_pos_start} , $old_sarray);
         } else {
             $muts{$miss_start} = $old_sarray;
         }
@@ -674,6 +715,33 @@ sub append_sarray {
             $$sarray[$i] .= $app_seq;
         }
         return;
+    }
+}
+
+sub append_sarray_new {
+    my ($sarray, $append, $max_alts) = @_;
+    # append_sarray($old_sarray, $sarray);
+    unless (defined $max_alts) {
+        $max_alts = scalar(@$append) - 1;
+    }
+    if (ref($sarray) eq '') {confess()}
+    my @ret;
+    if (! @$sarray) {
+        for (my $i=0; $i<=$max_alts ; $i++) {
+            my $app_seq = $$append[$i];
+            $app_seq='' if $app_seq eq '-'; # skip miss
+            #$$sarray[$i] = $app_seq;
+            $ret[$i] = $app_seq;
+        }
+        return(\@ret, $sarray);
+    } else {
+        for (my $i=0; $i<=$max_alts ; $i++) {
+            my $app_seq = $$append[$i];
+            next if $app_seq eq '-'; # skip miss
+            #$$sarray[$i] .= $app_seq;
+            $ret[$i] = $$sarray[$i] . $app_seq;
+        }
+        return(\@ret, $sarray);
     }
 }
 

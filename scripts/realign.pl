@@ -62,6 +62,7 @@ our $not_use_merge_alle_afterall = 0; # realign后合并兼容的位点（两个
 my $mask_bed_file;
 my $mask_bed;
 my $skip_snp = 0;
+our $not_allow_ext_bp_append = 0;
 
 sub usage {
     my $msg = shift;
@@ -77,11 +78,12 @@ options:
     -e | --ext_bp_min <int>        Min extension bp (default: $ext_bp_min)
     --mask_bed_file <file>         Mask bed file
     --tmpdir <dir>                 Temprory directory (default: $tmp_dir)
-    --chr_tolerance                Tolerance of chr name (default: $chr_tolerance)
+    --chr_tolerance <bool>         Tolerance of chr name (default: False)
     -h | --help                    Print this help
     --verb <int>
     --all <bool>                   Print lines even no mutation.
     --skip_snp <bool>              Skip snp
+    --not_allow_ext_1_bp <bool>
     --level <BITCODE>              Level &2 will not merge lines. (Default: $align_level)
                                    Level &4 will split missing alleles.
                                    Level &8 will force not split any alleles.
@@ -112,6 +114,7 @@ GetOptions (
         'not_use_merge_alle_afterall!' => \$not_use_merge_alle_afterall,
         'mask_bed_file=s' => \$mask_bed_file,
         'skip_snp!' => \$skip_snp,
+        'not_allow_ext_1_bp!' => \$not_allow_ext_bp_append,
 );
 
 
@@ -467,12 +470,19 @@ sub process_line_new {
     }
     my ($muts);
     my $ref_alt_max_length = $alt_max_length > $ref_len ? $alt_max_length : $ref_len;
+    my @ext_1bp;
+    if($not_allow_ext_bp_append==0) {
+        my $reflen = length($$ref_alts[0]);
+        my $ext_1bp_after = &get_ref_substr_seq($chr, $win_start+$reflen, $win_start+$reflen);
+        my $ext_1bp_before = &get_ref_substr_seq($chr, $win_start-1, $win_start-1);
+        @ext_1bp = ($ext_1bp_before, $ext_1bp_after);
+    }
     if( ($ref_alt_max_length>1e3 and $max_alts>100)  or
                       ($ref_alt_max_length>1e5)  or
                       ($ref_alt_max_length>1000 and $alt_max_length>400) )  {
-        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length);
+        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, undef, \@ext_1bp);
     } else {
-        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length);
+        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, undef, \@ext_1bp);
     }
     if (! defined $muts) {
         say STDERR "Fail to cal aln !! : ";
