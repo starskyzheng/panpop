@@ -87,7 +87,7 @@ cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long Li
   `mapper`: Maping algorithm. Can be either 'map' or 'gaffe'. Default is 'gaffe'.
 
 ## <a name="parametersDetailed"></a>Detailed parameters
-  This part were defined in `configs/base.yaml`
+  This part were defined in `configs/base.yaml`. This config were used by both TGS and NGS pipeline.
   
 ### Filter Parameters:
   `MAP_MINQ`: minimal mapping-quality of each reads for giraffe-mapping in VG. Default is 5  
