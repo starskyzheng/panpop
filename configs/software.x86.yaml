@@ -12,6 +12,7 @@ tabix: "tabix"
 bgzip: "bgzip"
 
 # Only for SV caller for raw long reads
+minimap2: 'minimap2'
 ngmlr: 'ngmlr'
 sniffles: 'sniffles'
 cutesv: 'cuteSV'

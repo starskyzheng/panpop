@@ -1,6 +1,22 @@
 import re
 import os
 import sys
+import shutil
+
+
+def exe_check_ret_abs_path(exe):
+    if exe is None:
+        raise Exception("Error!!! config error: {}".format(exe))
+    if os.path.exists(exe) and os.path.isfile(exe) and os.access(exe, os.X_OK):
+        abspath = os.path.abspath(exe)
+        return abspath
+    elif shutil.which(exe) is not None:
+        abspath = shutil.which(exe)
+        return abspath
+    else:
+        raise Exception("Can't find executable: {}".format(exe))
+
+
 
 def cal_fa_len(fa_file):
     """

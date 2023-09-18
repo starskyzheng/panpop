@@ -142,7 +142,7 @@ rule realign1:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 4 >> {log} 2>&1 && \
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 4 >> {log} 2>&1
         """
 
 
@@ -164,7 +164,7 @@ rule realign2:
         tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 6 >> {log} 2>&1 && \
+        perl {workflow.basedir}/scripts/realign.pl --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --tmpdir {params.tmpdir} --level 6 >> {log} 2>&1
         """
 
 rule filter_maf2:
@@ -202,7 +202,7 @@ rule sv2pav:
     shell:
         """
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} >> {log} 2>&1 && \
-        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} --threads {threads} >> {log} 2>&1 && \
+        perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} --threads {threads} >> {log} 2>&1
         """
 
 rule filter_maf1:

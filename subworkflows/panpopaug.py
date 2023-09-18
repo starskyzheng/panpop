@@ -136,9 +136,11 @@ rule aug_merge_rawvcfs_gen_list:
 
 rule aug_merge_rawvcfs:
     input:
-        vcfslist = '7.aug_merge_rawvcf/1.inputvcfs.{chrm}.list'
+        vcfslist = '7.aug_merge_rawvcf/1.inputvcfs.{chrm}.list',
+        vcfs = expand('6.aug_dp/3.vcf_with_dp.{{chrm}}/{sample}.sorted.vcf.gz', sample=SAMPLES),
+        tbis = expand('6.aug_dp/3.vcf_with_dp.{{chrm}}/{sample}.sorted.vcf.gz.tbi', sample=SAMPLES),
     output:
-        vcf = '7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
+        vcf = '7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz',
     log:
         'logs/7.2.merge_rawvcf.{chrm}.log'
     threads: 44

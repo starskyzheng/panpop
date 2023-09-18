@@ -1,0 +1,24 @@
+
+#################### Basic Parameters ####################
+## Absolute paths are recommended for workdir and sample_reads_list_file
+# workdir: Dir contains sample_read.list and will store result files.
+workdir: "example/example_long_reads"
+
+# sample_reads_list_file: File name of sample_read.list. Must located in wirkdir.
+sample_reads_list_file: "1.sample.reads.tsv"
+
+# mode: (simple or enhanced). `simple` mode will call SVs through 5 SV-caller and merge using PanPop `enhanced` recalculated depth information and then merge SVs using PanPop. Default is `enhanced`.
+mode: "enhanced"
+
+# reference file in fasta format
+ref: 'Ref.fa'
+
+# minimum support caller number for SVs
+MIN_SUPPORT_CALLER: 2
+
+# SV caller list to be used. Default is all 5 SV callers. Options: [sniffles, cuteSV, svim, pbsv, Assemblytics]
+SV_CALLER_LIST: [sniffles, cuteSV, svim, pbsv, Assemblytics]
+
+# Long reads mapper, default is `minimap2`. Options: [minimap2, ngmlr]
+MAPPER: 'minimap2'
+
