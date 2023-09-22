@@ -32,7 +32,7 @@ snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset
 ```
   Results located in `example/example_long_reads` and `example/example_short_reads`.
 
-  This was a minimal example, which should be completed within 1 minute.
+  This was a minimal example, which should be completed within 1 minute and produce vcfs with no SVs/SNPs.
  
 ## <a name="install"></a>Installation:
 ### Installation using conda (recommended)
