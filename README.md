@@ -36,6 +36,7 @@ snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset
  
 ## <a name="install"></a>Installation:
 ### Installation using conda (recommended)
+This will create a new conda env named `panpop`. This should be done less than 1 hour, but highly dependent on the network and hardware.
 ```sh
 conda env create -f conda.panpop.yaml
 conda activate panpop
