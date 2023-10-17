@@ -197,11 +197,12 @@ rule sv2pav:
     params:
         tmpdir = config['memory_tmp_dir'],
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
+        sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
         max_len_tomerge = 5,
-        sv_min_dp = config['SV_min_length']
+        sv_min_dp = config['SV_min_length'],
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} >> {log} 2>&1 && \
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --tmpdir {params.tmpdir} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >> {log} 2>&1 && \
         perl {workflow.basedir}/scripts/sv2pav.pl --invcf {output.vcf1} --outvcf {output.vcf2} --sv_min_dp {params.sv_min_dp} --max_len_tomerge {params.max_len_tomerge} --threads {threads} >> {log} 2>&1
         """
 

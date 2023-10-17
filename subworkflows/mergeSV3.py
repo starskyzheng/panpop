@@ -70,9 +70,12 @@ rule thin11:
     resources:
         mem_mb = 10000
     log: "logs/3.04.{sample}.thin11.log"
+    params:
+        sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
+        sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.6 --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold {parmas.sv2pav_merge_diff_threshold} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --threads {threads} >>{log} 2>&1
         """
 
 # perl {workflow.basedir}/scripts/sv2pav.pl --invcf 7.thin1.vcf.gz --outvcf 7.thin2.vcf.gz --max_len_tomerge 5 --sv_min_dp 50
@@ -112,11 +115,14 @@ rule thin21:
         vcf = "04_consensus_vcf/{sample}/06.thin1.unsorted.vcf.gz",
     threads: config['cores_realign']
     log: "logs/3.06.{sample}.thin21.log"
+    params:
+        sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
+        sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
     resources:
         mem_mb = 10000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold 40 --sv2pav_merge_identity_threshold 0.5 --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >>{log} 2>&1
         """
     
 rule thin22:

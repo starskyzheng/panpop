@@ -14,6 +14,11 @@ dp_min_abs: 3
 mad_min_fold: 0.111
 mad_min_abs: 1
 
+#################### Thin Parameters ####################
+# During thin process, minimal sequence similarity of alleles to be merged. Default is 0.8
+sv2pav_merge_identity_threshold: 0.6
+# During thin process, maximal of differenation bases count to be merged. Default is 40
+sv2pav_merge_diff_threshold: 40
 
 #################### Realign Parameters ####################
 # realign_extend: During realign progress, the near by SNP/SVs will be merged together before realign. Values that are too low or too large may lose some accuracy. Default is 10 and 1.
@@ -32,8 +37,6 @@ memory_tmp_dir: "Default"
 aug_nonmut_min_cov: 0.8
 # aug_nomut_min_dp: In augment mode, if the average of depth of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Default is 3.
 aug_nomut_min_dp: 3
-# During thin process, minimal sequence similarity of alleles to be merged. Default is 0.8
-sv2pav_merge_identity_threshold: 0.8
 # ssindel: simple or small indel. Size default is 10 and 3.
 ssindel_maxlen: 10
 ssindel_maxallele: 3

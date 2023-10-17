@@ -276,7 +276,7 @@ rule aug_thin_complexVCF:
         tmpdir = config['memory_tmp_dir'],
         max_len_tomerge = 5,
         sv_min_dp = config['SV_min_length'],
-        sv2pav_merge_diff_threshold = 40,
+        sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
     shell:
         """
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >> {log} 2>&1 && \
@@ -317,7 +317,7 @@ rule aug_thin2_complexVCF:
         tmpdir = config['memory_tmp_dir'],
         max_len_tomerge = 5,
         sv_min_dp = config['SV_min_length'], 
-        sv2pav_merge_diff_threshold = 40,
+        sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
     shell:
         """
         perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf1} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --tmpdir {params.tmpdir} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >> {log} 2>&1 && \
