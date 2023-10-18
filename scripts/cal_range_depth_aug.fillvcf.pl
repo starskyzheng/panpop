@@ -48,9 +48,11 @@ EOF
 
 
 my $APPEND_HEADER = <<'EOF';
-##FORMAT=<ID=MDP,Number=1,Type=Float,Description="Mean Read Depth"
-##FORMAT=<ID=RACOV,Number=1,Type=Float,Description="Coverage of this position in reference allele"
-##FORMAT=<ID=DPSOURCE,Number=1,Type=String,Description="source of Depth. can be both or original or append"
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
+##FORMAT=<ID=MDP,Number=1,Type=Float,Description="Mean Read Depth">
+##FORMAT=<ID=RACOV,Number=1,Type=Float,Description="Coverage of this position in reference allele">
+##FORMAT=<ID=DPSOURCE,Number=1,Type=String,Description="source of Depth. can be both or original or append">
 EOF
 
 my ($in_vcf, $out_vcf, $dp_file, $ref_file);
@@ -77,7 +79,7 @@ GetOptions (
         'chr=s' => \$need_chr,
 );
 
-$need_chr = undef if $need_chr eq 'all';
+$need_chr = undef if defined $need_chr and $need_chr eq 'all';
 
 unless ($in_vcf && $out_vcf && $dp_file && $ref_file) {
     help();
@@ -155,8 +157,7 @@ sub run {
             foreach my $reflen (sort {$a<=>$b} keys %{$dps->{$chr}{$pos}}) {
                 my $str = $dps->{$chr}{$pos}{$reflen} // next;#die "?? {$chr}{$pos}{$reflen}";
                 my ($dp, $cov) = split(/:/, $str);
-                my $ref_now = $$refs{$chr};
-                my $refseq_now = substr($ref_now, $pos-1, $reflen);
+                my $refseq_now = substr($$refs{$chr}, $pos-1, $reflen);
                 my $dpint = sprintf("%.0f", $dp);
                 say $O join("\t", $chr, $pos, '.', $refseq_now, '.', '.',
                 '.', '.', 'GT:DP:MDP:RACOV:DPSOURCE', "0/0:$dpint:$dp:$cov:append");

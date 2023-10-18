@@ -12,7 +12,7 @@ use List::Util qw(sum);
 no warnings 'experimental::smartmatch';
 use Data::Dumper;
 
-my ($in, $ref_fasta_file, $opt_help, $software, $not_rename);
+my ($in, $ref_fasta_file, $opt_help, $software, $not_rename, $newname);
 
 my ($out, $out_inv, $out_ins, $out_del);
 my $clear_info = 1;
@@ -41,6 +41,7 @@ Usage: $0 -i <in.vcf> -r <ref.fa> -o <out.vcf>
     --max_len <int>         max length of SV, default $max_len
     --min_dp <int>          min reads depth of SV. 0 to disable filter default $min_dp
     --not_rename            do not rename the sample name in vcf header
+    --newname <str>         rename the sample name in vcf header
     --clear_info <int>      clear info field, default $clear_info
     --remove_no_mut <int>   remove no mutation sites(0/0), default $remove_no_mut
     --remove_missing <int>  remove missing sites(./.), default $remove_missing
@@ -65,6 +66,7 @@ GetOptions (
         'clear_info=i' => \$clear_info,
         'remove_no_mut=i' => \$remove_no_mut,
         'remove_missing=i' => \$remove_missing,
+        'newname=s' => \$newname,
 );
 
 &help() if $opt_help;
@@ -126,9 +128,10 @@ LINE:while(<$I>) { # vcf-header
             say $del_fh $_ if defined $del_fh;
         } else {
             $header[8] //= 'GT';
-            say $O join "\t", @header[0..8], $software;
-            say $ins_fh join "\t", @header[0..8], $software if defined $ins_fh;
-            say $del_fh join "\t", @header[0..8], $software if defined $del_fh;
+            my $new_name_now = defined $newname ? $newname : $software;
+            say $O join "\t", @header[0..8], $new_name_now;
+            say $ins_fh join "\t", @header[0..8], $new_name_now if defined $ins_fh;
+            say $del_fh join "\t", @header[0..8], $new_name_now if defined $del_fh;
         }
         last;
     }

@@ -21,7 +21,7 @@
 use strict;
 use warnings;
 use utf8;
-no warnings qw( experimental::smartmatch );
+no warnings qw( experimental::smartmatch qw );
 use v5.24;
 
 use FindBin qw($Bin);
@@ -45,7 +45,7 @@ my ($opt_help);
 my $threads = 1;
 my $min_dp = 3;
 my $input_format = 'vg';
-my $ref_only;
+my $ref_only=0;
 
 GetOptions (
         'help|h!' => \$opt_help,
