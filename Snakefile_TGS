@@ -20,7 +20,8 @@ include: "subworkflows/util.py"
 
 SAMPLE_LIST = config['sample_reads_list_file']
 INDEX_REF = config['ref']
-MIN_SUPPORT_CALLER = config['MIN_SUPPORT_CALLER'] # Min support SV Caller count, Default 2
+MIN_SUPPORT_CALLER_WITH_ASSB = config['MIN_SUPPORT_CALLER_WITH_ASSB'] # Min support SV Caller count, Default 2
+MIN_SUPPORT_CALLER_WITHOUT_ASSB = config['MIN_SUPPORT_CALLER_WITHOUT_ASSB'] # Min support SV Caller count, Default 2
 ZTMPDIR = 'tmp'
 MAPPER=config['MAPPER']
 
@@ -41,6 +42,8 @@ BEDTOOLS = exe_check_ret_abs_path(config['bedtools'])
 BCFTOOLS = exe_check_ret_abs_path(config['bcftools'])
 TABIX = exe_check_ret_abs_path(config['tabix'])
 MINIMAP2 = exe_check_ret_abs_path(config['minimap2'])
+SAMTOOLS = exe_check_ret_abs_path(config['samtools'])
+SVIM_ASM = exe_check_ret_abs_path(config['svim_asm'])
 
 ZWORKDIR = config['workdir']
 workdir: ZWORKDIR
@@ -51,6 +54,8 @@ for dir in [ZTMPDIR]:
         os.makedirs(dir)
 
 def read_input_sample_csv(file):
+    if not os.path.exists(file):
+        raise Exception("Input file not exists: {}/{}".format(ZWORKDIR, file))
     df = pd.read_csv(file, sep='\t', index_col='sample')
     # must contain columns: sample, fq, AssmbFasta, platform
     if not set(['fq', 'AssmbFasta', 'platform']).issubset(df.columns):
@@ -76,8 +81,9 @@ include: "subworkflows/mergeSV3_pop.py"
 
 rule all:
     input:
-        expand("04_consensus_vcf/{sample}/10.concat_inv.split.sv.vcf.gz",sample=SAMPLE_INDEX),
+        expand("04_consensus_vcf/{sample}/01.merged.vcf.gz", sample=SAMPLE_INDEX),
         expand("04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz", sample=SAMPLE_INDEX),
+        expand("04_consensus_vcf/{sample}/10.concat_inv.split.sv.vcf.gz",sample=SAMPLE_INDEX),
         expand("04_consensus_vcf/{sample}/00.inv.vcf.gz", sample=SAMPLE_INDEX),
         "05_merge_samples/08.realign0.sorted.vcf.gz",
         "05_merge_samples/15.thin2.sv.vcf.gz",

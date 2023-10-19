@@ -125,6 +125,31 @@ def rgfa2chrs(rgfa_file):
                 f.write('\n')
         return(chrs)
 
+def get_assb_fasta(wildcards):
+    sid = wildcards.sample
+    try:
+        #fa = S2T.iloc[S2T.index==sid, :].values[0][1]
+        fa = S2T.loc[sid, 'AssmbFasta']
+    except:
+        fa = '-'
+    #print("get_assb_fasta::: {} : {}".format(sid, fa), file=sys.stderr)
+    if fa == '-':
+        return '-'
+    else:
+        fa_path = os.path.abspath(fa)
+        return fa_path
+
+def get_platform(wildcards):
+    sid = wildcards.sample
+    try:
+        #fa = S2T.iloc[S2T.index==sid, :].values[0][1]
+        platform = S2T.loc[sid, 'platform']
+        platform = platform.lower()
+    except:
+        print("Error! no platform for sid: {}".format(sid))
+        1
+    return platform
+
 
 
 rule sort_vcf:

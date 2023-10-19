@@ -1,4 +1,4 @@
-
+# include: "util.py"
 
 
 rule merge_vcf_same_pos:
@@ -75,7 +75,7 @@ rule thin11:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold {parmas.sv2pav_merge_diff_threshold} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --threads {threads} >>{log} 2>&1
         """
 
 # perl {workflow.basedir}/scripts/sv2pav.pl --invcf 7.thin1.vcf.gz --outvcf 7.thin2.vcf.gz --max_len_tomerge 5 --sv_min_dp 50
@@ -139,6 +139,13 @@ rule thin22:
         perl {workflow.basedir}/scripts/sv2pav.pl --invcf {input.vcf} --outvcf {output.vcf} --enable_norm_alle 1 --max_len_tomerge 20 --sv_min_dp 40 --threads {threads} >>{log} 2>&1
         """
 
+def get_min_support_caller(wildcards):
+    fa = get_assb_fasta(wildcards)
+    if fa == '-':
+        return MIN_SUPPORT_CALLER_WITHOUT_ASSB
+    else:
+        return MIN_SUPPORT_CALLER_WITH_ASSB
+
 rule merge_callers:
     input:
         vcf = "04_consensus_vcf/{sample}/06.thin2.sorted.vcf.gz",
@@ -150,7 +157,7 @@ rule merge_callers:
         mem_mb = 4000
     params:
         ext_parm = " --force_merge_insertion ",
-        min_support_callers = MIN_SUPPORT_CALLER
+        min_support_callers = get_min_support_caller
     shell:
         """
         perl {workflow.basedir}/scripts/long_caller_merger.pl --in {input.vcf} --min_supporting {params.min_support_callers} -s {wildcards.sample} --out {output.vcf} {params.ext_parm} >>{log} 2>&1

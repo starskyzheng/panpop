@@ -21,7 +21,7 @@ my $remove_missing = 1;
 
 my $max_len = 50000;
 my $min_dp = 5;
-my @known_softwares = qw/pbsv svim cutesv sniffles2 assemblytics guess_per_line svimmer/;
+my @known_softwares = qw/pbsv svim cutesv sniffles2 assemblytics guess_per_line svimmer svim_asm/;
 
 my $known_softwares_str = join ', ', @known_softwares;
 
@@ -96,36 +96,39 @@ $del_fh = open_out_fh($out_del) if defined $out_del;
 #$inv_bed = new zzBed({outfile=>$out_inv, max_len=>$max_len});
 my @header;
 
-LINE:while(<$I>) { # vcf-header
-    chomp;
+LINE:while(my $line = <$I>) { # vcf-header
+    chomp $line;
     my $software_guessed;
-    if(/^#/) {
-        if(/^##/) {
-            if(/^##source=([a-zA-Z0-9]+)/) {
+    if($line=~/^#/) {
+        if($line=~/^##/) {
+            if($line=~/^##source=([a-zA-Z0-9]+)/) {
                 $software_guessed = $1;
                 $software_guessed = lc $software_guessed;
                 if(!defined $software) {
-                    if ($software_guessed ~~ @known_softwares) {
+                    if($line=~/SVIM-asm-v1/) {
+                        $software = 'svim_asm';
+                        say STDERR "software guessed: $software";
+                    } elsif ($software_guessed ~~ @known_softwares) {
                         $software = $software_guessed;
                         say STDERR "software guessed: $software";
-                    } else {
+                    }else {
                         die "Fail to guess software and software name not defined, please use -s to specify it";
                     }
                 }
             }
-            say $O $_;
-            say $ins_fh $_ if defined $ins_fh;
-            say $del_fh $_ if defined $del_fh;
+            say $O $line;
+            say $ins_fh $line if defined $ins_fh;
+            say $del_fh $line if defined $del_fh;
             next;
         }
         say $O qq+##CommandLine="$ARGVs"+;
         say $ins_fh qq+##CommandLine="$ARGVs"+ if defined $ins_fh;
         say $del_fh qq+##CommandLine="$ARGVs"+ if defined $del_fh;
-        @header = split /\t/, $_;
+        @header = split /\t/, $line;
         if(defined $not_rename) {
-            say $O $_;
-            say $ins_fh $_ if defined $ins_fh;
-            say $del_fh $_ if defined $del_fh;
+            say $O $line;
+            say $ins_fh $line if defined $ins_fh;
+            say $del_fh $line if defined $del_fh;
         } else {
             $header[8] //= 'GT';
             my $new_name_now = defined $newname ? $newname : $software;
@@ -246,6 +249,19 @@ LINE:while(<$I>) { # vcf
         }
     } elsif($software_ eq 'assemblytics') {
         # do nothing
+    } elsif($software_ eq 'svim_asm') {
+        if($F[6] ne 'PASS') { # FILTER
+            next LINE;
+        }
+        if( $F[4] =~ '^<DUP') {
+            $type = 'INS';
+            &Update_ref_alt(\@F, 'DUP');
+        } elsif($F[2]=~/^svim_asm\.INV\.\d+$/) {
+            $type = 'INV';
+            if (defined $out_inv) {
+                $inv_bed->add_inv_bed(\@F, $svid); next LINE;
+            }
+        }
     } elsif($software_ eq 'cutesv') {
         $dp = &get_DR_DV(\@F);
         if($svid =~ /cuteSV.DEL\.\w+$/) {
@@ -355,6 +371,8 @@ sub guess_software_by_svid {
     $svid = lc($svid);
     if($svid =~ /pbsv/) {
         return 'pbsv';
+    } elsif($svid =~ /svim_asm/) {
+        return 'svim_asm';
     } elsif($svid =~ /svim/) {
         return 'svim';
     } elsif($svid =~ /cutesv/) {

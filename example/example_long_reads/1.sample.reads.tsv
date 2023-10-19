@@ -1,5 +1,5 @@
 sample	platform	fq	AssmbFasta
 s1	hifi	s1.fq.gz	s1.fa
-s2	hifi	s1.fq.gz	s2.fa
+s2	hifi	s1.fq.gz	-
 s3	pb	s1.fq.gz	s1.fa
 s4	ont	s1.fq.gz	s2.fa

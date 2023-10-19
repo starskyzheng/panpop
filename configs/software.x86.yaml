@@ -23,6 +23,7 @@ nucmer: 'nucmer'
 deltafilter: 'delta-filter'
 showcoords: 'show-coords'
 assemblytics: 'Assemblytics'
+svim_asm: 'svim-asm'
 bedtools: 'bedtools'
 samtools: 'samtools'
 

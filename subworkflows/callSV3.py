@@ -1,29 +1,5 @@
 import os
-
-def get_assb_fasta(wildcards):
-    sid = wildcards.sample
-    try:
-        #fa = S2T.iloc[S2T.index==sid, :].values[0][1]
-        fa = S2T.loc[sid, 'AssmbFasta']
-    except:
-        fa = '-'
-    #print("get_assb_fasta::: {} : {}".format(sid, fa), file=sys.stderr)
-    if fa == '-':
-        return '-'
-    else:
-        fa_path = os.path.abspath(fa)
-        return fa_path
-
-def get_platform(wildcards):
-    sid = wildcards.sample
-    try:
-        #fa = S2T.iloc[S2T.index==sid, :].values[0][1]
-        platform = S2T.loc[sid, 'platform']
-        platform = platform.lower()
-    except:
-        print("Error! no platform for sid: {}".format(sid))
-        1
-    return platform
+# include: "util.py"
 
 # def fq_make_softlink(wildcards):
 #     sid = wildcards.sample
@@ -91,7 +67,7 @@ rule minimap2_alignment:
     params:
         extra_parm = lambda wildcards: get_minimap2_parms(wildcards)
     shell:
-        "{MINIMAP2} {params.extra_parm} --MD -Y -t {threads} {input.ref} {input.reads} 2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}"
+        "{MINIMAP2} {params.extra_parm} --MD -Y -t {threads} {input.ref} {input.reads} -R '@RG\\tID:4\\tSM:{output}\\tLB:library1\\tPL:illumina\\tPU:unit1' 2>>{log}  | {SAMTOOLS} view -h -o {output} --output-fmt BAM 2>>{log}"
 
 rule ngmlr_alignment:
     input:
@@ -107,8 +83,8 @@ rule ngmlr_alignment:
     params:
         extra_parm = lambda wildcards: get_ngmlr_parms(wildcards)
     shell:
-        "{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout {params.extra_parm} 2>>{log} | perl -alne 'print and next if /^\@/; next if $F[4]<0; next if length($F[9])!=length($F[10]); print' 2>>{log} | samtools view -h -o {output} --output-fmt BAM 2>>{log}" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
-        #"{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout -x ont | perl -lne 'print and next if /^\@/; /^\S+\t\S+\t\S+\t\S+\t(\S+)/ or die; print if $1>=0' | samtools view -h -o {output} --output-fmt BAM" # | samtools sort --output-fmt BAM --threads 12 -o {output}"
+        "{NGMLR} --rg-id 4 --rg-sm '{output}' --rg-lb library1 --rg-pl illumina --rg-pu unit1 -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout {params.extra_parm} 2>>{log} | perl -alne 'print and next if /^\@/; next if $F[4]<0; next if length($F[9])!=length($F[10]); print' 2>>{log} | {SAMTOOLS} view -h -o {output} --output-fmt BAM 2>>{log}" # | {SAMTOOLS} sort --output-fmt BAM --threads 12 -o {output}"
+        #"{NGMLR} -t {threads} -r {input.ref} -q {input.reads} -o /dev/stdout -x ont | perl -lne 'print and next if /^\@/; /^\S+\t\S+\t\S+\t\S+\t(\S+)/ or die; print if $1>=0' | {SAMTOOLS} view -h -o {output} --output-fmt BAM" # | {SAMTOOLS} sort --output-fmt BAM --threads 12 -o {output}"
 
 rule sort_bam:
     input:
@@ -119,7 +95,7 @@ rule sort_bam:
     resources:
         mem_mb = 10000
     shell:
-        "samtools sort -@ {threads} -O BAM -o {output} {input} "
+        "{SAMTOOLS} sort -@ {threads} -O BAM -o {output} {input} "
 
 rule index:
     input:
@@ -131,7 +107,7 @@ rule index:
     resources:
         mem_mb = 1000
     shell:
-        "samtools index {input} "
+        "{SAMTOOLS} index {input} "
 
 rule sniffles_call:
     input:
@@ -208,8 +184,6 @@ rule svim_call:
 
 rule pbsv_align:
     input:
-        #"02_bam/{sample}.{platform}.{mapper}.sort.bam",
-        #"02_bam/{sample}.{platform}.{mapper}.sort.bam.bai"
         bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER),
         bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
@@ -223,7 +197,9 @@ rule pbsv_align:
 
 rule pbsv_discovery:
     input:
-        "02_bam/{sample}.pbsv.sort.bam"
+        #bam = "02_bam/{sample}.pbsv.sort.bam"
+        bam = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER),
+        bai = lambda wildcards: "02_bam/{sample}.{platform}.{mapper}.sort.bam.bai".format(sample=wildcards.sample, platform=get_platform(wildcards), mapper=MAPPER)
     output:
         outfile="03_vcf/04_pbsv/{sample}/pbsv.svsig.gz",
     threads: 1
@@ -235,7 +211,7 @@ rule pbsv_discovery:
     shell:
         """
         mkdir -p {params.outdir}
-        {PBSV} discover {input} {output.outfile} 2>>{log}
+        {PBSV} discover {input.bam} {output.outfile} 2>>{log}
         """
 
 
@@ -329,7 +305,65 @@ rule Assemblytics5parse:
         {TABIX} {output.vcf} 2>>{log}
         """
 
+rule SVIM_asm_call_1_map:
+    input:
+        ref = INDEX_REF,
+        que = get_assb_fasta
+    threads: config['cores_sv3_call']
+    log: "logs/2.{sample}.SVIM_asm.1.minimap2.log"
+    output:
+        bam = "03_vcf/06_SVIM_asm/{sample}/1.minimap.bam",
+    resources:
+        mem_mb = 20000
+    shell:
+        """
+        {MINIMAP2} -a -x asm5 --cs -r2k -t {threads} {input.ref} {input.que} 2>>{log} | {SAMTOOLS} view -b -o {output.bam} - 2>>{log}
+        """
 
+rule SVIM_asm_call_2_sort:
+    input:
+        bam = "03_vcf/06_SVIM_asm/{sample}/1.minimap.bam",
+    output:
+        sort_bam = "03_vcf/06_SVIM_asm/{sample}/2.minimap.sort.bam",
+    threads: 4
+    resources:
+        mem_mb = 10000
+    shell:
+        """
+        {SAMTOOLS} sort -@{threads} -m4G -O BAM -o {output.sort_bam} {input.bam}
+        """
+
+rule SVIM_asm_call_3_index:
+    input:
+        sort_bam = "03_vcf/06_SVIM_asm/{sample}/2.minimap.sort.bam",
+    output:
+        sort_bam_bai = "03_vcf/06_SVIM_asm/{sample}/2.minimap.sort.bam.bai",
+    threads: 1
+    log: "logs/2.{sample}.SVIM_asm.3.index.log"
+    resources:
+        mem_mb = 1000
+    shell:
+        """
+        {SAMTOOLS} index {input.sort_bam} 2>>{log}
+        """
+
+rule SVIM_asm_call_4_haploidrun:
+    input:
+        sort_bam = "03_vcf/06_SVIM_asm/{sample}/2.minimap.sort.bam",
+        sort_bam_bai = "03_vcf/06_SVIM_asm/{sample}/2.minimap.sort.bam.bai",
+        ref = INDEX_REF,
+    output:
+        vcf = "03_vcf/06_SVIM_asm/{sample}/3.haploid/variants.vcf",
+    threads: config['cores_sv3_call']
+    log: "logs/2.{sample}.SVIM_asm.4.haploid.log"
+    params:
+        outdir = "03_vcf/06_SVIM_asm/{sample}/3.haploid",
+    resources:
+        mem_mb = config['mem_sv3_call']
+    shell:
+        """
+        {SVIM_ASM} haploid {params.outdir} {input.sort_bam} {input.ref}  2>>{log}
+        """
 
 rule filter_parse:
     input:
@@ -434,6 +468,9 @@ def get_consensus_vcfs_to_merge(wildcards):
         vcfs.append("03_vcf/04_pbsv/{}/pbsv.parse.vcf.gz".format(sid))
     if 'assemblytics' in SV_CALLER_LIST_lower and fa != '-':
         vcf = "03_vcf/05_Assemblytics/{}/5.parse.vcf.gz".format(sid)
+        vcfs.append(vcf)
+    if 'svim_asm' in SV_CALLER_LIST_lower and fa != '-':
+        vcf = "03_vcf/06_SVIM_asm/{}/3.haploid/variants.parse.vcf.gz".format(sid)
         vcfs.append(vcf)
     return vcfs
 
