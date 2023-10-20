@@ -24,7 +24,7 @@ MIN_SUPPORT_CALLER_WITH_ASSB = config['MIN_SUPPORT_CALLER_WITH_ASSB'] # Min supp
 MIN_SUPPORT_CALLER_WITHOUT_ASSB = config['MIN_SUPPORT_CALLER_WITHOUT_ASSB'] # Min support SV Caller count, Default 2
 ZTMPDIR = 'tmp'
 MAPPER=config['MAPPER']
-
+MERGE_SV_POP = config['MERGE_SV_POP']
 
 # paths
 NGMLR = exe_check_ret_abs_path(config['ngmlr'])
@@ -78,17 +78,20 @@ include: "subworkflows/callSV3.py"
 include: "subworkflows/mergeSV3.py"
 include: "subworkflows/mergeSV3_pop.py"
 
-
-rule all:
-    input:
-        expand("04_consensus_vcf/{sample}/01.merged.vcf.gz", sample=SAMPLE_INDEX),
-        expand("04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz", sample=SAMPLE_INDEX),
-        expand("04_consensus_vcf/{sample}/10.concat_inv.split.sv.vcf.gz",sample=SAMPLE_INDEX),
-        expand("04_consensus_vcf/{sample}/00.inv.vcf.gz", sample=SAMPLE_INDEX),
-        "05_merge_samples/08.realign0.sorted.vcf.gz",
-        "05_merge_samples/15.thin2.sv.vcf.gz",
-        "05_merge_samples/15.thin3.sv.vcf.gz",
-
-
-
-
+if MERGE_SV_POP == True:
+    rule all:
+        input:
+            expand("04_consensus_vcf/{sample}/01.merged.vcf.gz", sample=SAMPLE_INDEX),
+            expand("04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz", sample=SAMPLE_INDEX),
+            expand("04_consensus_vcf/{sample}/10.concat_inv.split.sv.vcf.gz",sample=SAMPLE_INDEX),
+            expand("04_consensus_vcf/{sample}/00.inv.vcf.gz", sample=SAMPLE_INDEX),
+            "05_merge_samples/08.realign0.sorted.vcf.gz",
+            "05_merge_samples/15.thin2.sv.vcf.gz",
+            "05_merge_samples/15.thin3.sv.vcf.gz",
+else:
+    rule all:
+        input:
+            expand("04_consensus_vcf/{sample}/01.merged.vcf.gz", sample=SAMPLE_INDEX),
+            expand("04_consensus_vcf/{sample}/09.thin2.sorted.vcf.gz", sample=SAMPLE_INDEX),
+            expand("04_consensus_vcf/{sample}/10.concat_inv.split.sv.vcf.gz",sample=SAMPLE_INDEX),
+            expand("04_consensus_vcf/{sample}/00.inv.vcf.gz", sample=SAMPLE_INDEX),

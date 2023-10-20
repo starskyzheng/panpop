@@ -22,3 +22,5 @@ SV_CALLER_LIST: [sniffles, cuteSV, svim, pbsv, Assemblytics]
 # Long reads mapper, default is `minimap2`. Options: [minimap2, ngmlr]
 MAPPER: 'minimap2'
 
+# whether merge population SV. True of False
+MERGE_SV_POP: True
