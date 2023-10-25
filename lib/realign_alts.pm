@@ -121,11 +121,14 @@ sub check_bin_path {
 sub select_aln_software {
     my ($lefti, $length, $nalts, $force_aln_method) = @_;
     my $next;
+    if($debug>=1) {
+        say STDERR "SVlen: $length, nalts: $nalts";
+    }
     if (defined $force_aln_method and exists $$lefti{$force_aln_method} and $$lefti{$force_aln_method} > 0) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{$force_aln_method}+1;
         $$lefti{$force_aln_method}--;
         return($force_aln_method, $tried);
-    } elsif ( $length<1000 and $nalts<100 and $length*$nalts<10000 and exists $$lefti{muscle} and $$lefti{muscle}>0) {
+    } elsif ( $length<3000 and $nalts<100 and $length*$nalts<10000 and exists $$lefti{muscle} and $$lefti{muscle}>0) {
         my $tried = $ALN_PARAMS_max_tryi-$$lefti{muscle}+1;
         $$lefti{muscle}--;
         return('muscle', $tried);
