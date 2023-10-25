@@ -43,7 +43,7 @@ use read_config qw/read_config_yaml/;
 use realign_alts qw/process_alts/;
 
 
-my ($infile, $outfile, $opt_help, $ref_fasta_file);
+my ($infile, $outfile, $opt_help, $ref_fasta_file, $force_use_aln_software);
 our $tmp_dir_def = '/run/user/' . `id -u`; chomp $tmp_dir_def;
 our $debug = 0;
 our $verb = 0;
@@ -115,6 +115,7 @@ GetOptions (
         'mask_bed_file=s' => \$mask_bed_file,
         'skip_snp!' => \$skip_snp,
         'not_allow_ext_1_bp!' => \$not_allow_ext_bp_append,
+        'force_use_aln_software=s' => \$force_use_aln_software,
 );
 
 
@@ -209,13 +210,13 @@ sub cal_max_ext_range {
     } else { # sv/indel
         $ext = int($max_len * 0.3)+1;
     }
-
     if ($ext > $ext_bp_max) {
         $ext = $ext_bp_max;
     } elsif ($ext < $ext_bp_min) {
         $ext = $ext_bp_min;
     }
     $end += $ext;
+    say STDERR "max_len=$max_len; alt_max_len=$alt_max_len; reflen=$reflen; ext=$ext; end=$end; end_real=$end_real" if $debug;
     if ($end > $max_end) {
         return ($end, $end_real);
     } else {
@@ -337,6 +338,7 @@ sub zz_mce_producer {
             if(defined $mask_bed_file) {
                 &split_queue_by_mask_bed(\@lines, \$iline);
             } else {
+                say STDERR "enqueue: $chr_old, $min_start, $end_real";
                 $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] ) if @lines;
             }
             @lines=();
@@ -480,9 +482,9 @@ sub process_line_new {
     if( ($ref_alt_max_length>1e3 and $max_alts>100)  or
                       ($ref_alt_max_length>1e5)  or
                       ($ref_alt_max_length>1000 and $alt_max_length>400) )  {
-        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, undef, \@ext_1bp);
+        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, $force_use_aln_software, \@ext_1bp);
     } else {
-        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, undef, \@ext_1bp);
+        ($muts) = &process_alts($ref_alts, $max_alts, $alt_max_length, $force_use_aln_software, \@ext_1bp);
     }
     if (! defined $muts) {
         say STDERR "Fail to cal aln !! : ";
@@ -561,7 +563,7 @@ sub rebuild_cons_seqs {
     my @phase_issue_ids;
     my %new_ref_alts = ($ref=>0);
     my %new_ids2alles;
-    say STDERR "Now start rebuild_cons_seqs" if $debug;
+    say STDERR "Now start rebuild_cons_seqs: $chr $win_start-$win_end $ref " . length($ref) if $debug;
     rebuild_cons_seqs_IDI:for (my $idi = 9; $idi <= $idi_max; $idi++) {
         #say STDERR "Now : $idi"; # debug
         #my %sites_status1; # -1:miss   0:ref    1:alt
