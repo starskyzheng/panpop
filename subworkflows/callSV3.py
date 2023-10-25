@@ -236,7 +236,7 @@ rule Assemblytics1nucmer:
         que = get_assb_fasta
     params:
         prefix = "03_vcf/05_Assemblytics/{sample}/1.nucmer",
-    threads: 3
+    threads: config['cores_sv3_call']
     log: "logs/2.{sample}.Assemblytics.1.nucmer.log"
     output:
         delta = "03_vcf/05_Assemblytics/{sample}/1.nucmer.delta",
@@ -247,7 +247,7 @@ rule Assemblytics1nucmer:
     shell:
         """
         mkdir -p {output.dir_now}
-        {NUCMER} --maxmatch -c 500 -b 500 -l 100 {input.ref} {input.que} --prefix {params.prefix} >{log} 2>&1
+        {NUCMER} --maxmatch -c 500 -b 500 -l 100 -t {threads} {input.ref} {input.que} --prefix {params.prefix} >{log} 2>&1
         """
 
 rule Assemblytics2filter:
