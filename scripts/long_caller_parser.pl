@@ -18,6 +18,7 @@ my ($out, $out_inv, $out_ins, $out_del);
 my $clear_info = 1;
 my $remove_no_mut = 1;
 my $remove_missing = 1;
+my $not_prase = 0; # only filter
 
 my $max_len = 50000;
 my $min_dp = 5;
@@ -45,6 +46,7 @@ Usage: $0 -i <in.vcf> -r <ref.fa> -o <out.vcf>
     --clear_info <int>      clear info field, default $clear_info
     --remove_no_mut <int>   remove no mutation sites(0/0), default $remove_no_mut
     --remove_missing <int>  remove missing sites(./.), default $remove_missing
+    --not_prase             only filter, do not parse
 EOF
     exit(-1);
 }
@@ -67,6 +69,7 @@ GetOptions (
         'remove_no_mut=i' => \$remove_no_mut,
         'remove_missing=i' => \$remove_missing,
         'newname=s' => \$newname,
+        'not_prase!' => \$not_prase,
 );
 
 &help() if $opt_help;
@@ -261,6 +264,8 @@ LINE:while(<$I>) { # vcf
             if (defined $out_inv) {
                 $inv_bed->add_inv_bed(\@F, $svid); next LINE;
             }
+        } elsif($F[2]=~/BND/) {
+            next LINE;
         }
     } elsif($software_ eq 'cutesv') {
         $dp = &get_DR_DV(\@F);
@@ -399,6 +404,9 @@ sub max {
 
 sub Update_ref_alt {
     my ($line, $type, $svlen_parm) = @_;
+    if($not_prase==1) {
+        return;
+    }
     my $chr = $$line[0];
     my $pos = $$line[1];
     my $infos = $$line[7];
