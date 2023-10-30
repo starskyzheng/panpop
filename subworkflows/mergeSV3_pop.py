@@ -278,7 +278,7 @@ rule pop_realign3:
         mem_mb = 20000
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 6 --skip_mut_at_same_pos 2 --not_use_merge_alle_afterall 0 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 4 --ext_bp_max 1 --ext_bp_min 1 --skip_mut_at_same_pos 2 --not_use_merge_alle_afterall 0 >>{log} 2>&1
         """
 
 

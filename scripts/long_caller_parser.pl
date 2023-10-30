@@ -18,6 +18,7 @@ my ($out, $out_inv, $out_ins, $out_del);
 my $clear_info = 1;
 my $remove_no_mut = 1;
 my $remove_missing = 1;
+my $filter_by_PASS = 1;
 my $not_prase = 0; # only filter
 
 my $max_len = 50000;
@@ -47,6 +48,7 @@ Usage: $0 -i <in.vcf> -r <ref.fa> -o <out.vcf>
     --remove_no_mut <int>   remove no mutation sites(0/0), default $remove_no_mut
     --remove_missing <int>  remove missing sites(./.), default $remove_missing
     --not_prase             only filter, do not parse
+    --filter_by_PASS        Filter by FILTER : PASS. default $filter_by_PASS
 EOF
     exit(-1);
 }
@@ -70,6 +72,7 @@ GetOptions (
         'remove_missing=i' => \$remove_missing,
         'newname=s' => \$newname,
         'not_prase!' => \$not_prase,
+        'filter_by_PASS=i' => \$filter_by_PASS,
 );
 
 &help() if $opt_help;
@@ -158,6 +161,9 @@ LINE:while(<$I>) { # vcf
         $software_ = &guess_software_by_svid($svid);
         next LINE unless defined $software_;
         #say STDERR "software guessed: $software";
+    }
+    if($filter_by_PASS==1 and $F[6] ne 'PASS') { # FILTER
+        next LINE;
     }
     if($software_ eq 'sniffles2') {
         $dp = &get_DR_DV(\@F);
@@ -253,9 +259,7 @@ LINE:while(<$I>) { # vcf
     } elsif($software_ eq 'assemblytics') {
         # do nothing
     } elsif($software_ eq 'svim_asm') {
-        if($F[6] ne 'PASS') { # FILTER
-            next LINE;
-        }
+
         if( $F[4] =~ '^<DUP') {
             $type = 'INS';
             &Update_ref_alt(\@F, 'DUP');

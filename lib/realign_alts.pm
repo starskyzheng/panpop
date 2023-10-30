@@ -312,7 +312,15 @@ sub process_alts {
     return($muts, $aln_seqlen);
 }
 
-
+sub get_last_ref_not_missing_posi {
+    my ($ref_aln_tie, $aln_seqlen) = @_;
+    for(my $i=$aln_seqlen-1; $i>=0; $i--) {
+        my $ref_base = $$ref_aln_tie[$i];
+        if($ref_base ne '-') {
+            return($i);
+        }
+    }
+}
 
 sub alt_alts_to_muts {
     # $mut{ipos}[ialt] = seq
@@ -327,6 +335,7 @@ sub alt_alts_to_muts {
         confess("length:  $l != $aln_seqlen") if $l != $aln_seqlen;
         tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
     }
+    #my $last_ref_not_missing_posi = &get_last_ref_not_missing_posi($tie_seqs[0], $aln_seqlen);
     my $miss_start = -9;
     my $is_miss=0;
     my $ref_missn=0;
@@ -379,13 +388,15 @@ sub alt_alts_to_muts {
                             my $old_ref_missn = $status_last->[6];
                             die if exists $muts{$old_miss_start};
                             if($$old_old_sarray[0] eq '') {
+                                # 旧的ref是空的
                                 &append_sarray($ext_1bp_before_sarray, $old_old_sarray);
                                 $muts{$old_miss_start-1} = $ext_1bp_before_sarray;
                                 $is_ext_1bp_before++;
                                 $miss_start = $i - $ref_missn;
                             } else {
+                                # 旧的ref不是空的
                                 $muts{$old_miss_start} = $old_old_sarray;
-                                $miss_start = $i - $ref_missn-1;
+                                $miss_start = $i - $ref_missn; # -1
                             }
                             $old_sarray = [];
                             &append_sarray($old_sarray, $old_sarray_now);
@@ -477,6 +488,7 @@ sub alt_alts_to_muts {
                 &append_sarray( $old_sarray, $ext_1bp_after_sarray);
             }
         } else {
+            # 最后一个SV的ref不是空的
             $muts{$miss_start} = $old_sarray;
         }
     }
