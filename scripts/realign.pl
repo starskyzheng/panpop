@@ -555,6 +555,7 @@ sub get_ref_substr_seq {
     }
 }
 
+
 sub rebuild_cons_seqs {
     my ($lines, $chr, $win_start, $win_end) = @_;
     my $ref = &get_ref_substr_seq($chr, $win_start, $win_end);
@@ -582,6 +583,7 @@ sub rebuild_cons_seqs {
             $last_start = $sv_start;
             my $ref_len = length($$line[3]);
             my $sv_end = $sv_start + $ref_len-1;
+            #say STDERR "Now SV:  $sv_end = $sv_start + $ref_len-1";
             my $alles = $$lines[$iline][$idi];
             if (!defined $alles) { # miss
                 next ILINE; # skip this position for this sample
@@ -617,7 +619,7 @@ sub rebuild_cons_seqs {
             CHECKPOS:for(my $p=$sv_start; $p<=$sv_end; $p++) {
                 if (exists $sites_status{$p} and $sites_status{$p} >= 1) {
                     my $id_now = $$vcf_header[$idi];
-                    say STDERR "Warn: Mutation overlaped! chr:$chr, wins:$win_start, wine:$win_end pos:$p id:$id_now" if $verb>=2;
+                    say STDERR "Warn: Mutation overlaped! chr:$chr, wins:$win_start, sv_start:$sv_start, sv_end:$sv_end, wine:$win_end pos:$p id:$id_now sites_status:$sites_status{$p}" if $verb>=2;
                     if($skip_mut_at_same_pos == 1) {
                         # 只要有一个位点有问题，就跳过这个个体的这一行
                         next ILINE;
@@ -674,6 +676,7 @@ sub rebuild_cons_seqs {
                 } else {
                     if($mut_is_ref_mut_hetero==1) {
                         $sites_status{$p} = $phase_status; # mut_is_ref_mut_hetero
+                        #say STDERR "Now set1 : chr:$chr, wins:$win_start, wine:$win_end pos:$p sites_status:$sites_status{$p}" if $verb>=3;
                     } else {
                         $sites_status{$p} = 8; # homo with mut
                     }
@@ -689,6 +692,7 @@ sub rebuild_cons_seqs {
                         $phase_status = 3-$phase_status; # 1->2, 2->1
                         for(my $p=$sv_start; $p<=$sv_end; $p++) {
                             $sites_status{$p} = $phase_status;
+                            #say STDERR "Now set2 : chr:$chr, wins:$win_start, wine:$win_end pos:$p sites_status:$sites_status{$p}" if $verb>=3;
                         }
                     }
                 }
