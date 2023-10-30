@@ -67,7 +67,7 @@ GetOptions (
         'd|min_dp=i' => \$min_dp,
         's|software=s' => \$software,
         'not_rename!' => \$not_rename,
-        'clear_info=i' => \$clear_info,
+        'clear_info=s' => \$clear_info,
         'remove_no_mut=i' => \$remove_no_mut,
         'remove_missing=i' => \$remove_missing,
         'newname=s' => \$newname,
@@ -238,10 +238,12 @@ LINE:while(<$I>) { # vcf
                     say STDERR "Error: No ins_seq: svim_ins_cal_seq error";
                     say STDERR "================== Line: $.";
                     die "@F";
+                    say STDERR "========================";
                 }
                 $F[4] = $ins_seq;
                 &Update_ref_alt(\@F, 'INS');
             }
+            &Update_ref_alt(\@F, 'INS') if($F[3] eq 'N');
         } elsif( $svid =~ /svim.INV\.\w+$/ ) {
             $type = 'INV';
             if (defined $out_inv) {
@@ -296,7 +298,7 @@ LINE:while(<$I>) { # vcf
             next LINE;
         }
     } elsif($software_ eq 'svimmer') {
-        /SVTYPE=(\w+)/ or die;     
+        /SVTYPE=(\w+)/ or die;
         my $svtype = $1;
         next if $svtype eq 'BND';
         my $alts = $F[4];
@@ -329,14 +331,23 @@ LINE:while(<$I>) { # vcf
         say STDERR "Warn: skip line for unknown software: $software: @F";
         next LINE;
     }
-    if( $F[4]=~m/</ or $F[3]=~m/</ ) {
+    #die Dumper \@F;
+    if( $not_prase==0 and ($F[4]=~m/</ or $F[3]=~m/</) ) {
         unless($software eq 'svimmer' and $F[4] eq '<INS>') {
             next LINE;
         }
     }
     my $svlen = &max(length($F[3]), length($F[4]));
     next if $svlen > $max_len;
-    $F[7] = '.' if $clear_info==1; # remove all infos
+    if($clear_info eq '1') {
+        # remove all infos
+        $F[7] = '.' 
+    } elsif($clear_info eq '0') {
+        # do nothing
+    } else {
+        # remove all infos except SVLEN ; END ; SVTYPE
+        $F[7] = &clear_info_cal($F[7], $clear_info);
+    }
     if(defined $ins_fh and $type eq 'INS') {
         say $ins_fh join "\t", @F;
     } elsif(defined $del_fh and $type eq 'DEL') {
@@ -345,6 +356,8 @@ LINE:while(<$I>) { # vcf
         say $O join "\t", @F;
     }
 }
+
+
 
 if (defined $out_inv) {
     #die Dumper $inv_bed;
@@ -355,6 +368,20 @@ if (defined $out_inv) {
 
 
 exit;
+
+sub clear_info_cal {
+    my ($info, $keeps) = @_;
+    my @keeps = split /,/, $keeps;
+    my @infos = split /;/, $info;
+    my @infos_new;
+    foreach my $info (@infos) {
+        my ($key, $value) = split /=/, $info;
+        if($key ~~ @keeps) {
+            push @infos_new, $info;
+        }
+    }
+    return join ';', @infos_new;
+}
 
 
 sub svim_ins_cal_seq {
