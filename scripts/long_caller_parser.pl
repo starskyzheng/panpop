@@ -20,6 +20,7 @@ my $remove_no_mut = 1;
 my $remove_missing = 1;
 my $filter_by_PASS = 1;
 my $not_prase = 0; # only filter
+my $force = 0;
 
 my $max_len = 50000;
 my $min_dp = 5;
@@ -49,6 +50,7 @@ Usage: $0 -i <in.vcf> -r <ref.fa> -o <out.vcf>
     --remove_missing <int>  remove missing sites(./.), default $remove_missing
     --not_prase             only filter, do not parse
     --filter_by_PASS        Filter by FILTER : PASS. default $filter_by_PASS
+    --force
 EOF
     exit(-1);
 }
@@ -73,6 +75,7 @@ GetOptions (
         'newname=s' => \$newname,
         'not_prase!' => \$not_prase,
         'filter_by_PASS=i' => \$filter_by_PASS,
+        'force!' => \$force,
 );
 
 &help() if $opt_help;
@@ -233,14 +236,18 @@ LINE:while(<$I>) { # vcf
             if ($F[4] eq '<INS>') {
                 my $ins_seq = &svim_ins_cal_seq(\@F);
                 if (! defined $ins_seq) {
-                    say STDERR "========================";
-                    say STDERR "========================";
-                    say STDERR "Error: No ins_seq: svim_ins_cal_seq error";
-                    say STDERR "================== Line: $.";
-                    die "@F";
-                    say STDERR "========================";
+                    if(!$force) {
+                        say STDERR "========================";
+                        say STDERR "========================";
+                        say STDERR "Error: No ins_seq: svim_ins_cal_seq error";
+                        say STDERR "================== Line: $.";
+                        die "@F";
+                        say STDERR "========================";
+                    }
+                } else {
+                    $F[4] = $ins_seq;
                 }
-                $F[4] = $ins_seq;
+                
                 &Update_ref_alt(\@F, 'INS');
             }
             &Update_ref_alt(\@F, 'INS') if($F[3] eq 'N');
@@ -255,16 +262,21 @@ LINE:while(<$I>) { # vcf
             $type = 'INS';
             next LINE if $min_dp>0 and $dp < $min_dp;
             &Update_ref_alt(\@F, 'DUP');
+            if($F[3] eq 'N') {
+                &Update_ref_alt(\@F, 'INS');
+            }
         } else {
             next LINE;
         }
     } elsif($software_ eq 'assemblytics') {
         # do nothing
     } elsif($software_ eq 'svim_asm') {
-
         if( $F[4] =~ '^<DUP') {
             $type = 'INS';
             &Update_ref_alt(\@F, 'DUP');
+            if($F[3] eq 'N') {
+                &Update_ref_alt(\@F, 'INS');
+            }
         } elsif($F[2]=~/^svim_asm\.INV\.\d+$/) {
             $type = 'INV';
             if (defined $out_inv) {

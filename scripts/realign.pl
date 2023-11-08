@@ -62,6 +62,7 @@ our $not_use_merge_alle_afterall = 0; # realign后合并兼容的位点（两个
 my $mask_bed_file;
 my $mask_bed;
 my $skip_snp = 0;
+my $skip_n = 0;
 our $not_allow_ext_bp_append = 0;
 
 sub usage {
@@ -78,12 +79,12 @@ options:
     -e | --ext_bp_min <int>        Min extension bp (default: $ext_bp_min)
     --mask_bed_file <file>         Mask bed file
     --tmpdir <dir>                 Temprory directory (default: $tmp_dir)
-    --chr_tolerance <bool>         Tolerance of chr name (default: False)
+    --chr_tolerance                Tolerance of chr name (default: False)
     -h | --help                    Print this help
     --verb <int>
-    --all <bool>                   Print lines even no mutation.
-    --skip_snp <bool>              Skip snp
-    --not_allow_ext_1_bp <bool>
+    --all                          Print lines even no mutation.
+    --skip_snp                     Skip snp
+    --not_allow_ext_1_bp
     --level <BITCODE>              Level &2 will not merge lines. (Default: $align_level)
                                    Level &4 will split missing alleles.
                                    Level &8 will force not split any alleles.
@@ -114,6 +115,7 @@ GetOptions (
         'not_use_merge_alle_afterall!' => \$not_use_merge_alle_afterall,
         'mask_bed_file=s' => \$mask_bed_file,
         'skip_snp!' => \$skip_snp,
+        'skip_n=i' => \$skip_n,
         'not_allow_ext_1_bp!' => \$not_allow_ext_bp_append,
         'force_use_aln_software=s' => \$force_use_aln_software,
 );
@@ -126,6 +128,7 @@ if (! -e $tmp_dir) {
     mkdir $tmp_dir or die "cannot create tmpdir: $tmp_dir!";
 }
 
+$skip_n=1 if $skip_snp==1;
 our $config = read_config_yaml("$Bin/../config.yaml");
 realign_alts::init();
 $mask_bed = read_mask_bed_file($mask_bed_file) if $mask_bed_file;
@@ -311,10 +314,12 @@ sub zz_mce_producer {
         my $reflen = length($ref_seq);
         my @alts = split(/,/, $F[4]);
         $F[4] = \@alts;
-        if ($skip_snp==1) {
+        if ($skip_n>0) {
             my $alt_len_max = max(map {length($_)} @alts);
-            my $is_snp = $reflen == 1 && $alt_len_max == 1;
-            next if $is_snp==1; ##### skip snp
+            my $ref_alt_max_length = $alt_len_max > $reflen ? $alt_len_max : $reflen;
+            if ($ref_alt_max_length <= $skip_n) {
+                next;
+            }
         }
         if ($align_level & 2) { # align_level==2, not merge lines
             $end_real = $pos + $reflen - 1;
@@ -338,7 +343,7 @@ sub zz_mce_producer {
             if(defined $mask_bed_file) {
                 &split_queue_by_mask_bed(\@lines, \$iline);
             } else {
-                say STDERR "enqueue: $chr_old, $min_start, $end_real";
+                say STDERR "enqueue: $chr_old, $min_start, $end_real" if $debug;
                 $queue->enqueue( $iline, [\@lines, $chr_old, $min_start, $end_real] ) if @lines;
             }
             @lines=();
