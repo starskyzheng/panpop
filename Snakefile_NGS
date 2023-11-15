@@ -39,13 +39,12 @@ if config['split_chr']==True:
     elif config['mode'] == 'augment':
         rule all:
             input:
+                expand('7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz', chrm=CHRS),
+                expand('6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.sorted.vcf.gz.tbi', sample=SAMPLES, chrm=CHRS),
                 expand('8.aug_realign/6.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
-                '9.aug_final_result/1.realign1.final_mergechr.all.sorted.vcf.gz', # Augment output SV VCF
-                '9.aug_final_result/1.SV.split.final_mergechr.all.sv.vcf.gz', # Augment output SV VCF
-                '9.aug_final_result/2.SNP.split.final_mergechr.all.snp.vcf.gz', # Augment output SNP VCF
-                '9.aug_final_result/2.SNP.split.final_mergechr.all.indel.vcf.gz', # Augment output InDel VCF
+                '9.aug_final_result/5.thin3.final_mergechr.all.vcf.gz', # Augment output InDel VCF
                 '9.aug_final_result/6.filter_maf1.final_mergechr.all.vcf.gz', # Augment output PAV VCF
-                '9.aug_final_result/7.PAV.final_mergechr.all.sv.vcf.gz', # Augment output PAV VCF
+                '9.aug_final_result/6.filter_maf1.final_mergechr.all.sv.vcf.gz', # Augment output PAV VCF
 
 elif config['split_chr']==False:
     CHRS=['all']
