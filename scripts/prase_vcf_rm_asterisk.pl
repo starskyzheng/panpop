@@ -82,6 +82,7 @@ say STDERR "Done reading ref fasta $REF_SEQS_STAT";
 my $I = open_in_fh($infile);
 my $O = open_out_fh($outfile);
 
+my $old_pos__;
 my @old_stat; # chr   end  [old_line_split]   [seqs_for_ids] 
 while(<$I>) {
     chomp;
@@ -97,9 +98,17 @@ while(<$I>) {
     my $alts = $F[4];
     my @alts = split /,/, $alts;
     my $end = $pos + length($ref) - 1;
+    if(defined $old_pos__ and $old_pos__ == $pos) {
+        #say STDERR "Warn2! old_pos__ == pos!; skip this line: $_";
+        #next;
+    }
+    $old_pos__ = $pos;
     if(@old_stat and $chr eq $old_stat[0] and $pos <= $old_stat[1]) {
         # two muts were overlap, merge them
-        die "$chr $pos $old_stat[1]" unless $pos == $old_stat[1];
+        unless ($pos == $old_stat[1]) {
+            #say STDERR "Warn1! $chr $pos!=$old_stat[1]; skip this line: $_";
+            #next;
+        }
         if($alts=~m/\*/) {
             my $next_base = substr($REF_SEQS->{$chr}, $end, 1);
             #say $next_base;
@@ -107,6 +116,7 @@ while(<$I>) {
             $F[3] .= $next_base;
             $F[4] = join ',', @alts;
             $old_stat[1] = 1+$end;
+            $old_stat[4] = $pos;
         }
         my $newline = &merge_two_line($old_stat[2], \@F);
         $old_stat[2] = $newline;
@@ -124,7 +134,7 @@ while(<$I>) {
             $ref .= $next_base;
             $F[3] = $ref;
             $F[4] = join ',', @alts;
-            @old_stat = ($chr, 1+$end, \@F, []);
+            @old_stat = ($chr, 1+$end, \@F, [], $pos);
         } else {
             # not overlap, no asterisk, just print it
             say $O $_;
@@ -216,8 +226,8 @@ sub merge_alleles_each_id {
             my $rm1 = substr($seq1_a1, -1, 1, "");
             my $rm2 = substr($seq1_a2, -1, 1, "");
             unless($rm1 eq $rm2) {
-                say STDERR "@$line1";
-                die "Error: $idi, $rm1, $rm2";
+                say STDERR "Warn3! @$line1 ; @$line2";
+                #die "Error: $idi, $rm1, $rm2";
             }
             my $seqm_a1 = $seq1_a1 . $seq2_a1;
             my $seqm_a2 = $seq1_a2 . $seq2_a2;
