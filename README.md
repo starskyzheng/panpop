@@ -40,6 +40,7 @@ This will create a new conda env named `panpop`. This should be done less than 1
 ```sh
 conda env create -f conda.panpop.yaml
 conda activate panpop
+conda install -c bioconda svim-asm
 ```
 
 ### Installation manually
