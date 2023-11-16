@@ -68,7 +68,7 @@ cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long Li
 
   `MIN_SUPPORT_CALLER`: minimum support caller number for SVs. Default is 2
 
-  `SV_CALLER_LIST`: SV caller list to be used. Default is all 5 SV callers. Options: [sniffles, cuteSV, svim, pbsv, Assemblytics]
+  `SV_CALLER_LIST`: SV caller list to be used. Default is all 5 SV callers. Options: [sniffles, cuteSV, svim, pbsv, svim-asm, Assemblytics]
 
   `mapper`: Long reads mapper, default is `minimap2`. Options: [minimap2, ngmlr]. Default is 'minimap2'.
 
