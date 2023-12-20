@@ -146,6 +146,7 @@ if ($is_aug==0) {
 } else {
     die "?? Error";
 }
+my $REF_SEQS_LEN = &ref_seqs_len($REF_SEQS);
 say STDERR "Done reading ref fasta $REF_SEQS_STAT";
 
 my $VCF_APPEND = <<"EOF";
@@ -358,6 +359,9 @@ sub zz_mce_producer {
                 $end_real = $pos;
             }
             redo;
+        }
+        if($min_start > $pos) {
+            die "Error: is input vcf sorted? $chr_old:$min_start > $chr:$pos";
         }
         $min_start //= $pos;
         my ($max_end_now, $end_real_now) = &cal_max_ext_range($ref_seq, \@alts, $pos, $max_end);
@@ -883,3 +887,13 @@ sub read_mask_bed_file {
     }
     return(\%mask2);
 }
+
+sub ref_seqs_len {
+    my ($ref_seqs) = @_;
+    my %len;
+    foreach my $chr (keys %$ref_seqs) {
+        $len{$chr} = length($$ref_seqs{$chr});
+    }
+    return(\%len);
+}
+
