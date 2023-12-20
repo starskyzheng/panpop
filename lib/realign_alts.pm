@@ -386,7 +386,12 @@ sub alt_alts_to_muts {
                             my $old_sarray_now = $status_last->[3];
                             my $old_miss_start = $status_last->[5];
                             my $old_ref_missn = $status_last->[6];
-                            die if exists $muts{$old_miss_start};
+                            if (exists $muts{$old_miss_start}) {
+                                # merge two muts
+                                my $old_old_old_sarray = delete $muts{$old_miss_start};
+                                &append_sarray($old_old_old_sarray, $old_old_sarray);
+                                $old_old_sarray = $old_old_old_sarray;
+                            }
                             if($$old_old_sarray[0] eq '') {
                                 # 旧的ref是空的
                                 &append_sarray($ext_1bp_before_sarray, $old_old_sarray);
