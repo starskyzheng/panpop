@@ -131,6 +131,7 @@ exit;
 
 sub zzsystem {
     my ($cmd) = @_;
+    system("date");
     say STDERR $cmd;
     system($cmd);
 }
