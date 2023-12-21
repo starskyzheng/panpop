@@ -41,6 +41,7 @@ This will create a new conda env named `panpop`. This should be done less than 1
 conda env create -f conda.panpop.yaml
 conda activate panpop
 conda install -c bioconda svim-asm
+cpanm MCE::Channel Tie::CharArray
 ```
 
 ### Installation manually
