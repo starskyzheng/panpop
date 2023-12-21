@@ -36,6 +36,7 @@ my ($invcf_ori, $outdir, $ref_fasta_file);
 my ($force_run, $opt_help);
 my $threads = 32;
 my $not_first_merge = 0;
+my $tmpdir;
 
 sub usage {
     my $msg = shift;
@@ -50,6 +51,7 @@ options:
     --not_first_merge      Not first merge.
     --force                force run, skip check outdir is empty.
     -h, --help             help, print this message
+    --tmpdir <DIR>         tmp dir, default: /run/user/`UID`
 EOF
     die;
 }
@@ -65,6 +67,7 @@ GetOptions (
     'force' => \$force_run,
     't|threads=i' => \$threads,
     'not_first_merge' => \$not_first_merge,
+    'tmpdir=s' => \$tmpdir,
 );
 
 &usage() if !$invcf_ori or !$outdir or !$ref_fasta_file;
@@ -82,7 +85,8 @@ my $scripts_dir = "$Bin/../scripts";
     my $outvcf_sorted = "$outdir/1.realign0.sorted.vcf.gz";
     my $log = "$outvcf.log";
     my $append = '';
-    $append .= '--first_merge' if $not_first_merge==0;
+    $append .= ' --first_merge' if $not_first_merge==0;
+    $append .= " --tmpdir $tmpdir" if $tmpdir;
     my $cmd = "perl $scripts_dir/realign.pl --chr_tolerance --in_vcf $invcf --out_vcf $outvcf --ref_fasta_file $ref_fasta_file --threads $threads --ext_bp_max 500 --ext_bp_min 50 --skip_mut_at_same_pos 2 --level 1 $append 2>&1 | tee $log";
     zzsystem($cmd);
     &sort_vcf($outvcf, $outvcf_sorted);
@@ -90,13 +94,15 @@ my $scripts_dir = "$Bin/../scripts";
 
 #### 2.thin1
 {
+    my $append = '';
     my $invcf = "$outdir/1.realign0.sorted.vcf.gz";
     my $outvcf = "$outdir/2.thin1.unsorted.vcf.gz";
     my $outvcf_sorted = "$outdir/2.thin1.sorted.vcf.gz";
     my $log = "$outvcf.log";
     my $sv2pav_merge_identity_threshold = $config->{sv2pav_merge_identity_threshold};
     my $sv2pav_merge_diff_threshold = $config->{sv2pav_merge_diff_threshold};
-    my $cmd = "perl $scripts_dir/merge_similar_allele.pl --type 3 --invcf $invcf --outvcf $outvcf --sv2pav_merge_identity_threshold $sv2pav_merge_identity_threshold --sv2pav_merge_diff_threshold $sv2pav_merge_diff_threshold --threads $threads 2>&1 | tee $log";
+    $append .= " --tmpdir $tmpdir" if $tmpdir;
+    my $cmd = "perl $scripts_dir/merge_similar_allele.pl --type 3 --invcf $invcf --outvcf $outvcf --sv2pav_merge_identity_threshold $sv2pav_merge_identity_threshold --sv2pav_merge_diff_threshold $sv2pav_merge_diff_threshold --threads $threads $append 2>&1 | tee $log";
     zzsystem($cmd);
     &sort_vcf($outvcf, $outvcf_sorted);
 }
