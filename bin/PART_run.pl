@@ -56,9 +56,6 @@ EOF
     die;
 }
 
-&usage() if $opt_help;
-
-
 GetOptions (
     'h|help!' => \$opt_help,
     'i|in_vcf=s' => \$invcf_ori,
@@ -69,6 +66,9 @@ GetOptions (
     'not_first_merge' => \$not_first_merge,
     'tmpdir=s' => \$tmpdir,
 );
+
+&usage() if $opt_help;
+
 
 &usage() if !$invcf_ori or !$outdir or !$ref_fasta_file;
 
