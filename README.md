@@ -1,5 +1,7 @@
 # <a name="intro"></a>PanPop
 
+[![DOI](https://zenodo.org/badge/485607258.svg)](https://zenodo.org/doi/10.5281/zenodo.10458868)
+
 ### Sequence-aware SV merging and processing pipeline designed for a single individual, as well as TGS-based and NGS-based populations.
 
   &emsp;Merging structural variations (SVs) at the population level presents a significant challenge, yet it is essential for conducting thorough phenotypic analyses, especially in the era of pangenomics. Here we introduce PanPop, a new tool that utilizes an advanced sequence-aware SV merging algorithm to efficiently merge SVs of various types. PanPop demonstrates exceptional expertise in merging and optimizing the majority of multiallelic SVs into informative biallelic variants, showcasing superior precision and reduced rates of missing data when compared to alternative software solutions.
