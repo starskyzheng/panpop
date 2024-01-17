@@ -29,12 +29,14 @@
 ```sh
 git clone https://github.com/StarSkyZheng/panpop.git
 cd panpop
-snakemake -j 3 --reason --printshellcmds -s Snakefile_TGS # For TGS dataset
-snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset
+snakemake -j 3 --reason --printshellcmds -s Snakefile_TGS # For TGS dataset, using configs/config.TGS.yaml
+snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset, using configs/config.TGS.yaml
 ```
   Results located in `example/example_long_reads` and `example/example_short_reads`.
 
   This was a minimal example, which should be completed within 1 minute and produce vcfs with no SVs/SNPs.
+
+  This example declares the use of up to 3 threads. You can add threads via `-j`.
  
 ## <a name="install"></a>Installation:
 ### Installation using conda (recommended)
