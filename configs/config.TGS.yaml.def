@@ -15,8 +15,10 @@ ref: 'Ref.fa'
 
 # minimum support caller number for SVs
 MIN_SUPPORT_CALLER: 2
+MIN_SUPPORT_CALLER_WITHOUT_ASSB: 2
+MIN_SUPPORT_CALLER_WITH_ASSB: 2
 
-# SV caller list to be used. Default is all 5 SV callers. Options: [sniffles, cuteSV, svim, pbsv, Assemblytics, SVIM_asm]
+# SV caller list to be used. Default is 5 SV callers. Options: [sniffles, cuteSV, svim, pbsv, Assemblytics, SVIM_asm]
 SV_CALLER_LIST: [sniffles, cuteSV, svim, pbsv, SVIM_asm]
 
 # Long reads mapper, default is `minimap2`. Options: [minimap2, ngmlr]
