@@ -51,7 +51,7 @@ cpanm MCE::Channel Tie::CharArray
 ### Installation manually
   Install Software, and then add path to `config/software.yaml`. Some software were available in `misc/`
   
-  `famsa, muscle3, bcftools, vg, tabix, bgzip, minimap2, ngmlr, sniffles, cutesv, svim, picard, pbsv, nucmer, Assemblytics, bedtools, samtools`
+  `famsa, muscle3, bcftools, vg, tabix, bgzip, minimap2, ngmlr, sniffles, cutesv, svim, picard, pbsv, nucmer, svim-asm, Assemblytics, bedtools, samtools`
 
   Runtime dependencies: python3 & perl>=5.24   
 ```sh
