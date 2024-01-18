@@ -65,7 +65,7 @@ cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long Li
   
   `workdir`: Dir contains sample_read.list and will store result files.
 
-  `sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir. If assembly fasta is absent, just replace with "-".
+  `sample_reads_list_file`: File name of sample_read.list. Must located in wirkdir. If assembly fasta is absent, just replace with `-`.
   
   `mode`: (simple or enhanced). `simple` mode will call SVs through 5 SV-caller and merge using PanPop `enhanced` recalculated depth information and then merge SVs using PanPop. Default is `enhanced`.
 
