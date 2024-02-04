@@ -144,13 +144,7 @@ cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long Li
   `scripts/build_graph.pl` can be used to remove Non-Backbone paths of GFA format by using `--gfa`.
 
 ## <a name=cite></a>Citations
-  This software used `FAMSA`, `HAlign`, `bcftools`, `vg`, `muscle` and `snakemake` software: 
-- [1].Deorowicz, S., Debudaj-Grabysz, A., Gudyś, A. (2016) FAMSA: Fast and accurate multiple sequence alignment of huge protein families. Scientific Reports, 6, 33964
-- [2] Shixiang Wan and Quan Zou, HAlign-II: efficient ultra-large multiple sequence alignment and phylogenetic tree reconstruction with distributed and parallel computing, Algorithms for Molecular Biology, 2017, 12:25.
-- [3] Danecek P, Bonfield JK, et al. Twelve years of SAMtools and BCFtools. Gigascience (2021) 10(2):giab008.
-- [4] Hickey, G., Heller, D., Monlong, J. et al. Genotyping structural variants in pangenome graphs using the vg toolkit. Genome Biol 21, 35 (2020).
-- [5] Edgar, R.C. (2004) MUSCLE: multiple sequence alignment with high accuracy and high throughput.Nucleic Acids Res. 32(5):1792-1797.
-- [6] Mölder, F., Jablonski, K.P., Letcher, B., Hall, M.B., Tomkins-Tinch, C.H., Sochat, V., Forster, J., Lee, S., Twardziok, S.O., Kanitz, A., Wilm, A., Holtgrewe, M., Rahmann, S., Nahnsen, S., Köster, J., 2021. Sustainable data analysis with Snakemake. F1000Res 10, 33.
+  Zheng, Z. et al. A sequence-aware merger of genomic structural variations at population scale. Nat Commun (2024). https://doi.org/10.1038/s41467-024-45244-9
 
 
 [gfa]: http://gfa-spec.github.io/GFA-spec/GFA1.html
