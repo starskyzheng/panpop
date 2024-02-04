@@ -10,7 +10,8 @@
 
 
 - [Usage](#Usage)
-  - [Quick Start](#example)
+  - [Quick Start: Pipeline](#pipe_example)
+  - [Quick Start: Standalone](#s_example)
   - [Installation](#install)
   - [Parameters For TGS data](#parametersTGS)
   - [Parameters For NGS data](#parametersNGS)
@@ -20,24 +21,57 @@
 
 
 ## <a name="usage"></a>Usage
-  A graph-based genome in GFA format and resequnce reads were needed. 
-  Reference gfa should be renamed as Ref.gfa.
-  Created a list file contains paired-end seq reads (like example/1.sample.reads.list).
+### <a name="pipe_example"></a>Pipeline Example:
+#### For TGS data: 
+  You will require TGS sequencing reads for each sample and a reference genome in FASTA format. Optionally, you can also provide genome assemblies for each sample to enable SV-caller based on assemblies.
+  
+  Create a list file containing paired-end TGS sequencing reads (refer to the example at `example/example_long_reads/1.sample.reads.tsv`).
+  
+#### For NGS data: 
+  A graph-based genome in GFA format and NGS resequnce reads for each samples were needed. 
+  
+  Create a list file containing paired-end NGS sequencing reads (as shown in `example/example_short_reads/1.sample.reads.list`).
+  
+#### Then (For both TGS and NGS data):
   Modify `workdir` and `sample_reads_list_file` in config.yaml.
+  
   You are ready to go!
-### <a name="example"></a>Example:
+  
 ```sh
 git clone https://github.com/StarSkyZheng/panpop.git
 cd panpop
 snakemake -j 3 --reason --printshellcmds -s Snakefile_TGS # For TGS dataset, using configs/config.TGS.yaml
-snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset, using configs/config.TGS.yaml
+snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset, using configs/config.NGS.yaml
 ```
-  Results located in `example/example_long_reads` and `example/example_short_reads`.
+  Results located in `example/example_long_reads` or `example/example_short_reads`.
 
   This was a minimal example, which should be completed within 1 minute and produce vcfs with no SVs/SNPs.
 
   This example declares the use of up to 3 threads. You can add threads via `-j`.
- 
+### <a name="s_example"></a>Standalone example:
+  To facilitate the processing of VCFs originating from different pipelines, we also provide standalone access to the PART algorithm and the Fill-Depth-Information process.
+
+  #### Standalone Entry for PART:
+  PART (PAnpop Realign and Thin)'s standalone entrance: `panpop/bin/PART_run.pl` 
+  
+  Here was an example to run PART twice using 16 threads:
+```sh
+perl panpop/bin/PART_run.pl --in_vcf INPUT.vcf -o OUTDIR_RUN1 -r REFERENCE.FASTA  -t 16 --tmpdir TMPDIR
+perl panpop/bin/PART_run.pl --in_vcf OUTDIR_RUN1/3.final.vcf.gz -o OUTDIR_RUN2 -r REFERENCE.FASTA -t 16 --tmpdir TMPDIR -not_first_merge
+```
+
+  #### Standalone Entry for Fill-depth-information:
+  The standalone entry for fill-depth information is located at: `panpop/bin/Fill_DP.pl`.
+  
+  Please note that this process exclusively adds depth information to SV entries in the input VCF with './.'. Post-processing is required where the output VCF file must be filtered by depth to reduce the false-negative rate.
+  
+  This process needs a merged VCF file which contains all SVs of all samples, VCFs for each samples before merge and BAM file for each samples.
+  
+  Sample information must be compiled in a TSV format (tab-separated) with three columns: sample_name, BAM_path, VCF_path. (No header line)
+```sh
+perl panpop/bin/Fill_DP.pl --in_vcf INPUT.vcf --outdir OUTDIR --ref_fasta_file REFERENCE.FASTA --threads 16 --sid2files SAMPLE_INFORMATION.tsv
+```
+
 ## <a name="install"></a>Installation:
 ### Installation using conda (recommended)
 This will create a new conda env named `panpop`. This should be done less than 1 hour, but highly dependent on the network and hardware.
