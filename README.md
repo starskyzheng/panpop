@@ -48,6 +48,9 @@ snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset, usi
   This was a minimal example, which should be completed within 1 minute and produce vcfs with no SVs/SNPs.
 
   This example declares the use of up to 3 threads. You can add threads via `-j`.
+
+  Please note that the default temporary directory is configured as `/run/user/UID`. Should this directory not exist on your system, you will need to specify an alternative directory by modifying the `memory_tmp_dir` parameter in `configs/base.yaml`.
+
 ### <a name="s_example"></a>Standalone example:
   To facilitate the processing of VCFs originating from different pipelines, we also provide standalone access to the PART algorithm and the Fill-Depth-Information process.
 
@@ -147,11 +150,11 @@ cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long Li
   `realign_extend_bp_max` & `realign_extend_bp_min`: During realign progress, the near by SNP/SVs will be merged together before realign. Values that are too low or too large may lose some accuracy. Default is 10 and 1.  
 
 ### More parameters
+  `memory_tmp_dir`: Temprory directory in memory. This directory must exists and must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
+
   `SV_min_length`: Minimal length for SVs. Variat more than one base and smaller than this value will treated as InDels. Default is 50.  
 
   `realign_max_try_times_per_method`: Max try-times of each align software. Default is 1.  
-
-  `memory_tmp_dir`: Temprory directory in memory. Must be a very fast disk. Left space can be smaller than 100Mb. Default is /run/user/USERID
 
   `aug_nonmut_min_cov`: In augment mode, if the coverage of SV in reference allele is greater than this value will be treated as exists. Note this value is the first filter parameter, the further filter based on depth will be perfomed. Defalut is 0.8.
 
