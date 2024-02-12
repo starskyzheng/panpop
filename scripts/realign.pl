@@ -421,6 +421,7 @@ sub split_queue_by_mask_bed {
 
 sub process_lines_new {
     my ($lines, $chr, $win_start, $win_end) = @_;
+    say STDERR "Now: $chr $win_start:$win_end" if $debug;
     my @lines_split;
     foreach my $F (@$lines) {
         #my @F = split(/\t/, $line);

@@ -845,6 +845,9 @@ sub read_fa_fh {
         #say STDERR $_;
         if (/^>(\S+)/) {
             $seqid_now = $1;
+            unless($seqid_now=~/^\d+$/) {
+                return undef; # Error during align
+            }
             next;
         }
         $seqs{$seqid_now} .= $_;
