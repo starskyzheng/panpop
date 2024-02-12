@@ -55,6 +55,8 @@ snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset, usi
   To facilitate the processing of VCFs originating from different pipelines, we also provide standalone access to the PART algorithm and the Fill-Depth-Information process.
 
   #### Standalone Entry for PART:
+  There was an exapmle from CodeOcean: https://doi.org/10.24433/CO.1577027.v1
+  
   PART (PAnpop Realign and Thin)'s standalone entrance: `panpop/bin/PART_run.pl` 
   
   Here was an example to run PART twice using 16 threads:
