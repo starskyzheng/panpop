@@ -23,7 +23,6 @@ use warnings;
 use utf8;
 no warnings qw( experimental::smartmatch );
 use v5.24;
-use zzIO;
 
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
@@ -31,6 +30,7 @@ use lib "$Bin/../lib";
 #use Data::Dumper;
 use Getopt::Long;
 use MCE::Loop;
+use zzIO;
 
 use read_config qw/read_config_yaml/;
 
