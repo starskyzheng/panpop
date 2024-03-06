@@ -10,7 +10,7 @@ rule merge_vcf_same_pos:
     threads: config['cores_realign']
     log: "logs/3.02.{sample}.merge_vcf_same_pos.log"
     resources:
-        mem_mb = 8000
+        mem_mb = 8000,
     shell:
         """
         perl {workflow.basedir}/scripts/merge_vcf_same_pos.pl --invcf {input.vcf} --outvcf {output.vcf} --ref {input.ref} --skip_mut_at_same_pos 2 --threads {threads} --ignore_dp >>{log} 2>&1
@@ -25,9 +25,11 @@ rule gen_merge_mask:
     log: "logs/3.02.{sample}.gen_merge_mask.log"
     resources:
         mem_mb = 8000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign_gen_mask.pl -i {input.vcf} -o {output.bed} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign_gen_mask.pl -i {input.vcf} -o {output.bed} --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 rule realign1:
@@ -40,9 +42,11 @@ rule realign1:
     log: "logs/3.03.{sample}.realign1.log"
     resources:
         mem_mb = 40000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --first_merge >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --first_merge --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 rule realign12:
@@ -55,11 +59,12 @@ rule realign12:
     log: "logs/3.03.{sample}.realign12.log"
     resources:
         mem_mb = 40000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 6 --skip_mut_at_same_pos 2 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 6 --skip_mut_at_same_pos 2 --tmpdir {params.tmpdir} >>{log} 2>&1
         """
-
 
 rule thin11:
     input:
@@ -73,9 +78,10 @@ rule thin11:
     params:
         sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl  --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --threads {threads} --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 # perl {workflow.basedir}/scripts/sv2pav.pl --invcf 7.thin1.vcf.gz --outvcf 7.thin2.vcf.gz --max_len_tomerge 5 --sv_min_dp 50
@@ -103,9 +109,11 @@ rule realign2:
     log: "logs/3.05.{sample}.realign2.log"
     resources:
         mem_mb = 20000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 4 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 4 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 rule thin21:
@@ -118,11 +126,12 @@ rule thin21:
     params:
         sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
+        tmpdir = config['memory_tmp_dir'],
     resources:
         mem_mb = 10000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --tmpdir {params.tmpdir} >>{log} 2>&1
         """
     
 rule thin22:
@@ -174,9 +183,11 @@ rule realign3:
     log: "logs/3.08.{sample}.realign3.log"
     resources:
         mem_mb = 4000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 1000 --ext_bp_max 1000 --mask_bed_file {input.mask_bed} --skip_snp 1 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 1000 --ext_bp_max 1000 --mask_bed_file {input.mask_bed} --skip_snp 1 --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 rule thin32:
