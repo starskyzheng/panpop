@@ -91,6 +91,7 @@ usage('HELP: -h') if $opt_help;
 usage("in_vcf not defined") unless defined $infile;
 usage("out_vcf not defined") unless defined $outfile;
 
+$tmp_dir = $tmp_dir_def if $tmp_dir eq "Default";
 our $config = read_config_yaml("$Bin/../config.yaml");
 realign_alts::init();
 

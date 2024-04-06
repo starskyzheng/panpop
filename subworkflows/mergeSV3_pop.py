@@ -30,10 +30,10 @@ rule aug_realign0:
     params:
         realign_extend_bp_max = 500,
         realign_extend_bp_min = 50,
-        #tmpdir = config['memory_tmp_dir']
+        tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge --tmpdir {params.tmpdir} >> {log} 2>&1
         """
 
 rule vcf2poss:
@@ -179,10 +179,10 @@ rule aug_realign0_filldp:
     params:
         realign_extend_bp_max = 500,
         realign_extend_bp_min = 50,
-        #tmpdir = config['memory_tmp_dir']
+        tmpdir = config['memory_tmp_dir']
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge >> {log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref_fasta_file} --threads {threads} --ext_bp_max {params.realign_extend_bp_max} --ext_bp_min {params.realign_extend_bp_min} --skip_mut_at_same_pos 2 --level 1 --first_merge --tmpdir {params.tmpdir} >> {log} 2>&1
         """
 
 
@@ -196,12 +196,13 @@ rule pop_thin11:
     params:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
         sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
+        tmpdir = config['memory_tmp_dir'],
     resources:
         mem_mb = 10000
     log: "logs/5.09.thin1.log"
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 # perl {workflow.basedir}/scripts/sv2pav.pl --invcf 7.thin1.vcf.gz --outvcf 7.thin2.vcf.gz --max_len_tomerge 5 --sv_min_dp 50
@@ -230,9 +231,11 @@ rule pop_realign2:
     log: "logs/5.11.realign2.log"
     resources:
         mem_mb = 20000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 1 --skip_mut_at_same_pos 2 --ext_bp_min 100 --ext_bp_max 400 --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 rule pop_thin21:
@@ -245,11 +248,12 @@ rule pop_thin21:
     params:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
         sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
+        tmpdir = config['memory_tmp_dir'],
     resources:
         mem_mb = 10000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} --tmpdir {params.tmpdir} >>{log} 2>&1
         """
     
 rule pop_thin22:
@@ -276,9 +280,11 @@ rule pop_realign3:
     log: "logs/5.14.realign3.log"
     resources:
         mem_mb = 20000
+    params:
+        tmpdir = config['memory_tmp_dir'],
     shell:
         """
-        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 4 --ext_bp_max 1 --ext_bp_min 1 --skip_mut_at_same_pos 2 --not_use_merge_alle_afterall 0 >>{log} 2>&1
+        perl {workflow.basedir}/scripts/realign.pl --chr_tolerance --in_vcf {input.vcf} --out_vcf {output.vcf} --ref_fasta_file {input.ref} --threads {threads} --level 4 --ext_bp_max 1 --ext_bp_min 1 --skip_mut_at_same_pos 2 --not_use_merge_alle_afterall 0 --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 
@@ -292,11 +298,12 @@ rule pop_thin31:
     params:
         sv2pav_merge_identity_threshold = config['sv2pav_merge_identity_threshold'],
         sv2pav_merge_diff_threshold = config['sv2pav_merge_diff_threshold'],
+        tmpdir = config['memory_tmp_dir'],
     resources:
         mem_mb = 4000
     shell:
         """
-        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} >>{log} 2>&1
+        perl {workflow.basedir}/scripts/merge_similar_allele.pl --type 3 --invcf {input.vcf} --outvcf {output.vcf} --sv2pav_merge_identity_threshold {params.sv2pav_merge_identity_threshold} --sv2pav_merge_diff_threshold {params.sv2pav_merge_diff_threshold} --threads {threads} --tmpdir {params.tmpdir} >>{log} 2>&1
         """
 
 
