@@ -64,7 +64,7 @@ snakemake -j 3 --reason --printshellcmds -s Snakefile_NGS # For NGS dataset, usi
 perl panpop/bin/PART_run.pl --in_vcf INPUT.vcf -o OUTDIR_RUN1 -r REFERENCE.FASTA  -t 16 --tmpdir TMPDIR
 perl panpop/bin/PART_run.pl --in_vcf OUTDIR_RUN1/3.final.vcf.gz -o OUTDIR_RUN2 -r REFERENCE.FASTA -t 16 --tmpdir TMPDIR -not_first_merge
 ```
-
+  Noted REF, ALT and GT (colunm 4, 5 and 9) need to be completed in the VCF file. (see https://github.com/starskyzheng/panpop/issues/18)
   #### Standalone Entry for Fill-depth-information:
   The standalone entry for fill-depth information is located at: `panpop/bin/Fill_DP.pl`.
   
