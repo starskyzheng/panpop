@@ -138,7 +138,7 @@ sub zzsystem {
 
 sub sort_vcf {
     my ($invcf, $outvcf) = @_;
-    my $cmd = "bcftools sort $invcf -o $outvcf";
+    my $cmd = "bcftools sort $invcf -o $outvcf --temp-dir $tmpdir/tmp_bcftools.";
     zzsystem($cmd);
 }
 
