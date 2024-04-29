@@ -36,7 +36,7 @@ my ($invcf_ori, $outdir, $ref_fasta_file);
 my ($force_run, $opt_help);
 my $threads = 32;
 my $not_first_merge = 0;
-my $tmpdir;
+my $tmpdir = "/run/user/$<";
 
 sub usage {
     my $msg = shift;
