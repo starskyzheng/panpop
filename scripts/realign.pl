@@ -311,6 +311,9 @@ sub zz_mce_producer {
         my $pos = $F[1];
         $F[3] = uc($F[3]);
         $F[4] = uc($F[4]);
+        if($F[4]=~/[<>]/) {
+            confess("Error! Wrong format at ALT, not bases only: ($chr:$pos) $F[4]");
+        }
         my $ref_seq = $F[3];
         my $reflen = length($ref_seq);
         my @alts = split(/,/, $F[4]);
