@@ -40,16 +40,17 @@ use read_config qw/read_config_yaml/;
 sub help {
     print STDERR <<EOF;
 usage: perl xx.pl 
-    --inlist FILE.vcfs.list 
-    --out FILE.vcf.gz
-    --tmp_dir PATH 
-    [--chrome STRING] Chromosome name
-    [--threads INT (default: 1)]  Number of bcftools running together
-    [--vcfs_per_run INT (default: 999999)]
+    -i|--inlist FILE.vcfs.list 
+    -o|--out FILE.vcf.gz
+    -T|--tmp_dir PATH 
+    [-r|--chrome STRING] Chromosome name
+    [-t|--threads INT (default: 1)]  Number of bcftools running together
+    [-V|--vcfs_per_run INT (default: 999999)]
     [--bcftools_threads INT (default: 4)]  Number of threads of 'bcftools merge'
     [--noclean]       Do not clean tmp files
     [--invcf_nocheck] Do not check input vcf.gz files wather they are exists and has .tbi files.
-    [--help]          Print this help message
+    [-h|--help]          Print this help message
+    [--m_none]           run bcftools merge with "-m none --non_normalize_alleles"
 EOF
     say STDERR @_ if @_;
     exit(-1);
