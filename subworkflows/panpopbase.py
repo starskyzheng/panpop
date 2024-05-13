@@ -58,34 +58,28 @@ rule merge_rawvcfs_gen_list:
             for vcf in input.vcfs:
                 f.write(vcf + '\n')
 
-if config['split_chr']==True:
-    rule merge_rawvcfs:
-        input:
-            vcfslist = '3.merge_rawvcf/1.inputvcfs.list'
-        output:
-            vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
-        log:
-            'logs/3.2.merge_rawvcf.{chrm}.log'
-        threads: 44
-        shell:
-            # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
-            """
-            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 -r {wildcards.chrm} --m_none 0 >> {log} 2>&1
-            """
-else : # no chr split
-    rule merge_rawvcfs:
-        input:
-            vcfslist = '3.merge_rawvcf/1.inputvcfs.list'
-        output:
-            vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
-        log:
-            'logs/3.2.merge_rawvcf.{chrm}.log'
-        threads: 44
-        shell:
-            # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} > {log} 2>&1
-            """
-            perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 --m_none 0 >> {log} 2>&1
-            """
+def merge_rawvcfs_chr_now(wildcards):
+    if config['split_chr']==True:
+        return '-r {}'.format(wildcards.chrm)
+    else:
+        return ''
+
+rule merge_rawvcfs:
+    input:
+        vcfslist = '3.merge_rawvcf/1.inputvcfs.list'
+    output:
+        vcf = '3.merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz'
+    log:
+        'logs/3.2.merge_rawvcf.{chrm}.log'
+    threads: 44
+    params:
+        chrm_now = merge_rawvcfs_chr_now
+    shell:
+        # {BCFTOOLS} merge -m none --non_normalize_alleles -o {output.vcf} -O z --threads {threads} -l {input.vcfslist} -r {wildcards.chrm} > {log} 2>&1
+        # -r {wildcards.chrm} 
+        """
+        perl {workflow.basedir}/scripts/merge_vcf.pl --inlist {input.vcfslist} --out {output.vcf} --tmp_dir {ZTMPDIR} --vcfs_per_run 10000 --threads 11 --bcftools_threads 4 --m_none 0 {params.chrm_now} >> {log} 2>&1
+        """
 
 rule merge_same_pos:
     input:
@@ -237,20 +231,7 @@ rule split_vcf_by_type2: # for non-split-chr
         """
         perl {workflow.basedir}/scripts/vcf_split_snp_indel_sv.pl {input.vcf} {params.outprefix} {params.min_sv_len}
         """
-
-if config['split_chr']==False:
-    rule cp_to_final:
-        input: 
-            vcf1 = '4.realign/2.2.filter_maf1.all.vcf.gz',
-            #vcf2 = '4.realign/4.filter_maf1.all.vcf.gz',
-        output:
-            vcf1 = '5.final_result/1.final_mergechr.all.vcf.gz',
-            #vcf2 = '5.final_result/2.final_mergechr.all.vcf.gz'
-        shell:
-            """
-            cp {input.vcf1} {output.vcf1}
-            """
-
+        
 
 rule merge_vcf_splitchrs_pav:
     input:
