@@ -59,7 +59,7 @@ Options:
     -i | --invcf       <FILE>  input vcf file
     -o | --outvcf      <FILE>  output file, default: $out
     -t | --threads     <INT>   thread number, default: $thread
-    --sv_min_dp        <INT>   sv_min_dp, default: $sv_min_dp
+    --sv_min_dp        <INT>   sv_min_bp, default: $sv_min_dp
     --max_len_tomerge  <INT>   max_len_tomerge SMALL allele, 0 for +∞, -1 to disable, default: $max_len_tomerge
     --min_diff_fold    <INT>   min different length (fold) to merge SMALL allele, default: $min_diff_fold
     --min_lendiff_tomerge  <INT>   min_len_diff_tomerge for BIG allele, 0 for -∞, default: $min_lendiff_tomerge
