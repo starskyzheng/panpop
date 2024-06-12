@@ -28,38 +28,26 @@ SAMPLES = list_prepaire_files(config['sample_reads_list_file'])
 if config['split_chr']==True:
     CHRS = gfa2chrs( GRAPH + '.gfa')
     #CHRS = rgfa2chrs( GRAPH + '.rgfa')
-    if config['mode'] == 'genotype':
-        rule all:
-            input:
-                expand('4.realign/2.2.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
-                '5.final_result/1.final_mergechr.pav.all.vcf.gz',
-                '5.final_result/1.final_mergechr.pav.sv.vcf.gz',
-                '5.final_result/2.final_mergechr.all.vcf.gz',
-                '5.final_result/2.final_mergechr.sv.vcf.gz',
-    elif config['mode'] == 'augment':
-        rule all:
-            input:
-                expand('7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz', chrm=CHRS),
-                expand('6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.sorted.vcf.gz.tbi', sample=SAMPLES, chrm=CHRS),
-                expand('8.aug_realign/6.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
-                '9.aug_final_result/5.thin3.final_mergechr.all.vcf.gz', # Augment output InDel VCF
-                '9.aug_final_result/6.filter_maf1.final_mergechr.all.vcf.gz', # Augment output PAV VCF
-                '9.aug_final_result/6.filter_maf1.final_mergechr.all.sv.vcf.gz', # Augment output PAV VCF
+else:
+    CHRS = ['all']
 
-elif config['split_chr']==False:
-    CHRS=['all']
-    if config['mode'] == 'genotype':
-        rule all:
-            input:
-                '5.final_result/1.final.all.all.vcf.gz',
-                '5.final_result/1.final.all.all.pav.vcf.gz',
-                '5.final_result/2.final.all.sv.vcf.gz',
-    elif config['mode'] == 'augment':
-        rule all:
-            input:
-                '9.aug_final_result/1.x.split.all.sv.vcf.gz', # Augment output SV VCF
-                '9.aug_final_result/2.SNP.split.all.snp.vcf.gz', # Augment output SV VCF
-                '9.aug_final_result/7.PAV.all.sv.vcf.gz', # Augment output PAV VCF
+if config['mode'] == 'genotype':
+    rule all:
+        input:
+            expand('4.realign/2.2.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+            '5.final_result/1.final_mergechr.pav.all.vcf.gz',
+            '5.final_result/1.final_mergechr.pav.sv.vcf.gz',
+            '5.final_result/2.final_mergechr.all.vcf.gz',
+            '5.final_result/2.final_mergechr.sv.vcf.gz',
+elif config['mode'] == 'augment':
+    rule all:
+        input:
+            expand('7.aug_merge_rawvcf/2.merge_rawvcf.{chrm}.vcf.gz', chrm=CHRS),
+            expand('6.aug_dp/3.vcf_with_dp.{chrm}/{sample}.sorted.vcf.gz.tbi', sample=SAMPLES, chrm=CHRS),
+            expand('8.aug_realign/6.filter_maf1.{chrm}.vcf.gz', chrm=CHRS),
+            '9.aug_final_result/5.thin3.final_mergechr.all.vcf.gz', # Augment output InDel VCF
+            '9.aug_final_result/6.filter_maf1.final_mergechr.all.vcf.gz', # Augment output PAV VCF
+            '9.aug_final_result/6.filter_maf1.final_mergechr.all.sv.vcf.gz', # Augment output PAV VCF
 
 
 if config['mode'] == 'genotype':
