@@ -169,7 +169,7 @@ cpanm Data::Dumper MCE::Flow MCE::Candy MCE::Channel MCE::Shared Getopt::Long Li
 ### Performance & Resource
   Cores and memorys for snakemake were defineded here
 
-## <a name=gfa_ref></a>Input GFA Reference file
+## <a name=gfa_ref></a>Input GFA Reference File
   Graph-genome should be [GFA format][gfa] and the name of the chromosome must be specified which should be numeric only.
   
   The GFA file to be run must contain path lines starting with `P`. Each `P` line represents one chromosome of the backbone genome.
