@@ -98,7 +98,8 @@ my $sids = read_vcf_header($invcf_ori, $sid2bam);
     #foreach (@$sids) {
     mce_loop {
         my $sid = $_;
-        my $bam = $$sid2bam{$sid}[0];
+        my $pack = $$sid2bam{$sid}[0];
+	my $vg = $$sid2bam{$sid}[1];
         my $dpfile = "$outdir_now/$sid.depth.txt.gz";
         my $list_packpg = "$outdir_now/$sid.list_packpg";
         my $log = "$dpfile.log";
@@ -120,8 +121,7 @@ my $sids = read_vcf_header($invcf_ori, $sid2bam);
     #foreach (@$sids) {
     mce_loop {
         my $sid = $_;
-        my $bam = $$sid2bam{$sid}[0];
-        my $vcf_sample_in = $$sid2bam{$sid}[1];
+        my $vcf_sample_in = $$sid2bam{$sid}[2];
         my $vcf_sample_out = "$outdir_now/$sid.vcf.gz";
         my $vcf_sample_out_sorted = "$outdir_now/$sid.sort.vcf.gz";
         my $dpfile = "$outdir/2.cal_aug_dp/$sid.depth.txt.gz";
@@ -129,7 +129,6 @@ my $sids = read_vcf_header($invcf_ori, $sid2bam);
         my $min_dp = 0;
         my $min_cov = $$config{'aug_nonmut_min_cov'};
         my $log = "$dpfile.log";
-        `echo '$sid $bam' > $list_packpg`;
         my $cmd = "perl $scripts_dir/cal_range_depth_aug.fillvcf.pl --in_vcf $vcf_sample_in --out_vcf $vcf_sample_out --ref $ref --min_cov $min_cov --min_dp $min_dp --dp_file $dpfile 2>&1 | tee $log";
         &zzsystem($cmd);
         my $cmd2 = "bcftools sort $vcf_sample_out -o $vcf_sample_out_sorted; tabix $vcf_sample_out_sorted";
