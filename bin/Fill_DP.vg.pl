@@ -104,7 +104,7 @@ my $sids = read_vcf_header($invcf_ori, $sid2bam);
         my $list_packpg = "$outdir_now/$sid.list_packpg";
         my $log = "$dpfile.log";
         `echo '$sid $pack $vg' > $list_packpg`;
-        my $cmd = "perl $scripts_dir/cal_range_depth_aug.pl --input_format vg --vcfposs $outpos --list_packpg $list_packpg --outdir $outdir_now -t 1 --input_format bam 2>&1 | tee $log";
+        my $cmd = "perl $scripts_dir/cal_range_depth_aug.pl --input_format vg --vcfposs $outpos --list_packpg $list_packpg --outdir $outdir_now -t 1 2>&1 | tee $log";
         &zzsystem($cmd);
     } (@$sids);
     MCE::Loop->finish;
