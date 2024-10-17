@@ -36,7 +36,7 @@ use read_config qw/read_config_yaml/;
 
 my ($invcf_ori, $outdir, $ref_fasta_file, $sid2files_file);
 my ($force_run, $opt_help);
-my $threads = 32;
+my $threads = 4;
 
 sub usage {
     my $msg = shift;
