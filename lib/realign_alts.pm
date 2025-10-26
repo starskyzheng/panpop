@@ -440,8 +440,9 @@ sub alt_alts_to_muts {
                                 $old_old_sarray = $old_old_old_sarray;
                             }
                             if ($old_old_sarray->[0] eq '') {
-                                &append_sarray($ext_1bp_before_sarray, $old_old_sarray);
-                                $muts{$old_miss_start-1} = $ext_1bp_before_sarray;
+                                my $ext_before_copy = $clone_sub->($ext_1bp_before_sarray);
+                                &append_sarray($ext_before_copy, $old_old_sarray);
+                                $muts{$old_miss_start-1} = $ext_before_copy;
                                 $is_ext_1bp_before++;
                                 $miss_start = $i - $ref_missn;
                             } else {
