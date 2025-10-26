@@ -1,0 +1,9 @@
+# Inline::C build artifacts
+/_Inline/
+
+# Editor swap files
+*.swp
+*.swo
+
+# macOS metadata
+.DS_Store

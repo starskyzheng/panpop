@@ -30,9 +30,7 @@ use List::Util qw/max min/;
 use Data::Dumper;
 use Carp qw/confess carp/; # carp=warn;confess=die
 use IPC::Open2;
-use Tie::CharArray;
 #use Clone qw(clone);
-use Storable qw(dclone);
 use File::Temp;
 
 require Exporter;
@@ -74,6 +72,68 @@ my $init = 0;
 my $force_realign = 0;
 my $not_use_merge_alle_afterall = 0;
 my $allow_ext_bp_append;
+my $FAST_HELPERS_AVAILABLE = 0;
+my $FAST_HELPERS_ENABLED  = 0;
+my $FAST_HELPERS_INIT_ERROR;
+
+BEGIN {
+    return if $ENV{REALIGN_ALTS_DISABLE_NATIVE};
+    eval {
+        require realign_alts_fast;
+        if (realign_alts_fast->can('available') && realign_alts_fast::available()) {
+            $FAST_HELPERS_AVAILABLE = 1;
+            $FAST_HELPERS_ENABLED  = 1;
+        }
+        1;
+    } or do {
+        $FAST_HELPERS_INIT_ERROR = $@;
+        $FAST_HELPERS_AVAILABLE  = 0;
+        $FAST_HELPERS_ENABLED    = 0;
+    };
+}
+
+sub _fast_helpers_available {
+    return $FAST_HELPERS_AVAILABLE;
+}
+
+sub _fast_helpers_enabled {
+    return $FAST_HELPERS_ENABLED;
+}
+
+sub _fast_helpers_init_error {
+    return $FAST_HELPERS_INIT_ERROR;
+}
+
+sub _ensure_fast_helpers_loaded {
+    return 1 if $FAST_HELPERS_AVAILABLE;
+    return 0 if $ENV{REALIGN_ALTS_DISABLE_NATIVE};
+    eval {
+        require realign_alts_fast;
+        if (realign_alts_fast->can('available') && realign_alts_fast::available()) {
+            $FAST_HELPERS_AVAILABLE = 1;
+            return 1;
+        }
+        0;
+    } or do {
+        $FAST_HELPERS_INIT_ERROR = $@;
+        return 0;
+    };
+}
+
+sub _set_fast_helpers_enabled {
+    my ($value) = @_;
+    if ($value) {
+        unless (_ensure_fast_helpers_loaded()) {
+            $FAST_HELPERS_ENABLED = 0;
+            carp "Native helpers not available" if $debug;
+            return 0;
+        }
+        $FAST_HELPERS_ENABLED = 1;
+    } else {
+        $FAST_HELPERS_ENABLED = 0;
+    }
+    return $FAST_HELPERS_ENABLED;
+}
 
 sub init {
     return if $init == 1;
@@ -325,184 +385,147 @@ sub get_last_ref_not_missing_posi {
 sub alt_alts_to_muts {
     # $mut{ipos}[ialt] = seq
     my ($alts, $max_alts, $ext_1bp) = @_; # aln_alts
-    #say STDERR Dumper $alts;
-    my @tie_seqs;
     my %muts;
-    my $aln_seqlen = length( $$alts[0] );
+    my $aln_seqlen = length( $alts->[0] );
     foreach my $ialt (0..$max_alts) {
-        my $seq = $$alts[$ialt] // confess "$ialt not in alts: " . Dumper $alts;
+        my $seq = $alts->[$ialt] // confess "$ialt not in alts: " . Dumper $alts;
         my $l = length($seq);
         confess("length:  $l != $aln_seqlen") if $l != $aln_seqlen;
-        tie $tie_seqs[$ialt]->@*, 'Tie::CharArray', $seq;
     }
-    #my $last_ref_not_missing_posi = &get_last_ref_not_missing_posi($tie_seqs[0], $aln_seqlen);
+    my $clone_sub = $FAST_HELPERS_ENABLED ? \&realign_alts_fast::clone_sarray_fast : \&clone_sarray_perl;
     my $miss_start = -9;
-    my $is_miss=0;
-    my $ref_missn=0;
-    my $old_sarray=[];
-    my $old_sarray_bak=[];
+    my $is_miss = 0;
+    my $ref_missn = 0;
+    my $old_sarray = [];
+    my $old_sarray_bak = [];
     my $status_last = [];
-    my $is_ref_miss_at_start=0;
+    my $is_ref_miss_at_start = 0;
     my ($last_nomiss_pos, $last_nomiss_sarray) = (0, []);
     my ($is_ext_1bp, $ext_1bp_before_sarray, $ext_1bp_after_sarray);
-    my $is_ext_1bp_before=0;
-    if(defined $ext_1bp and scalar(@$ext_1bp)==2) {
+    my $is_ext_1bp_before = 0;
+    if (defined $ext_1bp and scalar(@$ext_1bp)==2) {
         $is_ext_1bp = 1;
         my ($ext_1bp_before_bp, $ext_1bp_after_bp) = @$ext_1bp;
         $ext_1bp_before_sarray = [ ($ext_1bp_before_bp) x (1+$max_alts) ];
-        $ext_1bp_after_sarray = [ ($ext_1bp_after_bp) x (1+$max_alts) ];
+        $ext_1bp_after_sarray  = [ ($ext_1bp_after_bp)  x (1+$max_alts) ];
     } else {
         $is_ext_1bp = 0;
     }
     for (my $i = 0; $i < $aln_seqlen; $i++) {
-        #say STDERR $$old_sarray[0] if exists $$old_sarray[0];
-        $old_sarray_bak = dclone($old_sarray);
-        my $sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 1);
+        $old_sarray_bak = $clone_sub->($old_sarray);
+        my $sarray = &get_sarray($alts, $i, $max_alts, 1);
         my ($is_same_now, $is_miss_now, $is_ref_miss_now) = &sarray_is_same_miss($sarray, $max_alts);
-        say STDERR "!!" . " $i " . ($i-$ref_missn) . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, is_miss$is_miss" if $debug;
-        if ($is_miss_now==1) {
+        say STDERR "!! $i " . ($i-$ref_missn) . ' : ' . substr($alts->[0], $i, 1) . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, is_miss$is_miss" if $debug;
+        if ($is_miss_now == 1) {
             $ref_missn++ if $is_ref_miss_now;
-            if ($is_miss==1) {
-                # continue missing
+            if ($is_miss == 1) {
                 if ($align_level & 4) {
                     my $diff_is_same = &cal_sarray_is_compatible($old_sarray, $sarray);
-                    if ( $diff_is_same==0 and length($$old_sarray[0])>0 and 
-                            $is_ref_miss_now==0 ) {
-                        # not compatible, end missing. then start new missing
+                    if ($diff_is_same == 0 and length($old_sarray->[0]) > 0 and $is_ref_miss_now == 0) {
                         $muts{$miss_start} = $old_sarray;
-                        #say STDERR Dumper \%muts;
                         $miss_start = $i - $ref_missn;
                         $old_sarray = [];
                         $is_miss = 1;
                         $last_nomiss_pos = $i - $ref_missn;
                         $last_nomiss_sarray = $sarray;
-                    } elsif ($diff_is_same==0 and length($$old_sarray[0])>0 and 
-                            $is_ref_miss_now==1 and $status_last->[2]==0) {
-                        # not compatible, end missing. then start new missing
-                        # ref start miss 
+                    } elsif ($diff_is_same == 0 and length($old_sarray->[0]) > 0 and $is_ref_miss_now == 1 and $status_last->[2] == 0) {
                         my $old_old_sarray = $status_last->[4];
-                        if(defined $old_old_sarray and @$old_old_sarray) {
-                            # avoid ref start with missing
+                        if (defined $old_old_sarray and @$old_old_sarray) {
                             my $old_sarray_now = $status_last->[3];
                             my $old_miss_start = $status_last->[5];
-                            my $old_ref_missn = $status_last->[6];
+                            my $old_ref_missn  = $status_last->[6];
                             if (exists $muts{$old_miss_start}) {
-                                # merge two muts
                                 my $old_old_old_sarray = delete $muts{$old_miss_start};
                                 &append_sarray($old_old_old_sarray, $old_old_sarray);
                                 $old_old_sarray = $old_old_old_sarray;
                             }
-                            if($$old_old_sarray[0] eq '') {
-                                # 旧的ref是空的
-                                &append_sarray($ext_1bp_before_sarray, $old_old_sarray);
-                                $muts{$old_miss_start-1} = $ext_1bp_before_sarray;
+                            if ($old_old_sarray->[0] eq '') {
+                                my $ext_before_copy = $clone_sub->($ext_1bp_before_sarray);
+                                &append_sarray($ext_before_copy, $old_old_sarray);
+                                $muts{$old_miss_start-1} = $ext_before_copy;
                                 $is_ext_1bp_before++;
                                 $miss_start = $i - $ref_missn;
                             } else {
-                                # 旧的ref不是空的
                                 $muts{$old_miss_start} = $old_old_sarray;
-                                $miss_start = $i - $ref_missn; # -1
+                                $miss_start = $i - $ref_missn;
                             }
                             $old_sarray = [];
                             &append_sarray($old_sarray, $old_sarray_now);
                             &append_sarray($old_sarray, $sarray);
                             $is_miss = 1;
                             $last_nomiss_pos = $i - $old_ref_missn;
-                            # update status_last
                         }
                     }
                 }
                 &append_sarray($old_sarray, $sarray);
-            } elsif ($is_miss==0) {
-                # start missing
-                $is_miss=1;
-                if ($i==0) {
-                    # ref start with missing
+            } elsif ($is_miss == 0) {
+                $is_miss = 1;
+                if ($i == 0) {
                     $miss_start = 0;
-                    $old_sarray = &get_sarray(\@tie_seqs, 0, $max_alts, 0);
-                    $is_ref_miss_at_start=1 if $is_ref_miss_now==1;
+                    $old_sarray = &get_sarray($alts, 0, $max_alts, 0);
+                    $is_ref_miss_at_start = 1 if $is_ref_miss_now == 1;
                 } else {
-                    # start with missing in seq
                     $miss_start = $i - $ref_missn;
-                    if (exists $muts{$miss_start} or
-                        (defined $last_nomiss_pos and $last_nomiss_pos==$i-$ref_missn) ) {
-                        # already have a non-missing site at this pos
-                        # cover and replase this site
-                        if($miss_start==0 and exists $muts{$miss_start}) {
+                    if (exists $muts{$miss_start} or (defined $last_nomiss_pos and $last_nomiss_pos == $i - $ref_missn)) {
+                        if ($miss_start == 0 and exists $muts{$miss_start}) {
                             $old_sarray = delete $muts{$miss_start};
                         } else {
-                            $old_sarray = &get_sarray(\@tie_seqs, $i-1, $max_alts, 0);
+                            $old_sarray = &get_sarray($alts, $i-1, $max_alts, 0);
                         }
                         say STDERR "delete mut $miss_start" if $debug;
-                        #&append_sarray($sarray_old_del, $old_sarray);
-                        #die Dumper $alts;
                         &append_sarray($old_sarray, $sarray);
-                        #die Dumper $old_sarray;
                     } else {
-                        $old_sarray = &get_sarray(\@tie_seqs, $i, $max_alts, 0);
+                        $old_sarray = &get_sarray($alts, $i, $max_alts, 0);
                     }
                 }
-            } else {confess();}
-        } elsif ($is_miss==1) { # with $is_miss_now==0
-            # end missing
+            } else { confess(); }
+        } elsif ($is_miss == 1) {
             ($last_nomiss_pos, $last_nomiss_sarray) = (undef, undef);
             $is_miss = 0;
-            my $ref_len = length($$old_sarray[0]);
-            if ($ref_len>0) {
+            my $ref_len = length($old_sarray->[0]);
+            if ($ref_len > 0) {
                 $muts{$miss_start} = $old_sarray;
-                $old_sarray = []; $miss_start = -9;
+                $old_sarray = [];
+                $miss_start = -9;
                 redo;
             } else {
                 &append_sarray($old_sarray, $sarray);
                 $is_ref_miss_at_start = 0;
                 $muts{0} = $old_sarray;
-                $old_sarray = []; $miss_start = -9;
-                #say STDERR "D1:" . Dumper \%muts;
+                $old_sarray = [];
+                $miss_start = -9;
             }
         } else {
-            # not missing
             $last_nomiss_pos = $i - $ref_missn;
             $last_nomiss_sarray = $sarray;
-            if ($is_same_now==0) { # with $is_miss_now==0 and $is_miss==0 and $is_ref_miss_at_start==0
-                # not same
+            if ($is_same_now == 0) {
                 my $now_i = $i - $ref_missn;
                 $muts{$now_i} = $sarray;
-                $is_miss = 0 if $is_miss==1;
-            } elsif ($is_same_now==1) {
-                # do nothing;
+                $is_miss = 0 if $is_miss == 1;
+            } elsif ($is_same_now == 1) {
+                # do nothing
             } else {
                 confess();
             }
         }
         $status_last = [$is_same_now, $is_miss_now, $is_ref_miss_now, $sarray, $old_sarray_bak, $miss_start, $ref_missn];
-        #                    0              1           2               3             4             5             6
     }
-    if (@$old_sarray and $miss_start>=0) {
-        if ( length($$old_sarray[0])==0 ) {
-            # 最后一个SV的ref是空的
-            if(!defined $ext_1bp_after_sarray) {
-                # 将序列补到倒数第二个上
+    if (@$old_sarray and $miss_start >= 0) {
+        if (length($old_sarray->[0]) == 0) {
+            if (!defined $ext_1bp_after_sarray) {
                 my $last_pos_start = max(keys %muts);
-                if (! defined $last_pos_start) {
-                    confess "last_pos_start not defined";
-                }
+                confess "last_pos_start not defined" if !defined $last_pos_start;
                 &append_sarray($muts{$last_pos_start}, $old_sarray);
             } else {
-                # ext 1 base in the end
-                # ext_1bp
-                &append_sarray( $old_sarray, $ext_1bp_after_sarray);
+                &append_sarray($old_sarray, $ext_1bp_after_sarray);
             }
         } else {
-            # 最后一个SV的ref不是空的
             $muts{$miss_start} = $old_sarray;
         }
     }
-    # say STDERR "!!muts: " . Dumper \%muts;
-    &merge_alle_afterall(\%muts, $$alts[0]) if $not_use_merge_alle_afterall==0; # 合并可以合并的兼容的位点
-    #die Dumper $alts;
+    &merge_alle_afterall(\%muts, $alts->[0]) if $not_use_merge_alle_afterall==0;
     return (\%muts, $aln_seqlen);
 }
-
 
 sub merge_alle_afterall {
     my ($muts, $refseq) = @_;
@@ -592,7 +615,7 @@ sub alt_alts_to_muts_notuse {
         #say STDERR "!!" . " $i " . ' : ' . $tie_seqs[0][$i] . " is_same_now$is_same_now, is_miss_now$is_miss_now, is_ref_miss_now$is_ref_miss_now, now_pos_in_ref$now_pos_in_ref" ;
         if($is_same_now==1) { # this site has no mut
             if(scalar(@$old_sarray)>0) { # has mut before
-                if($$old_sarray[0] eq '') { # ref is start with missing, must extend
+                if($ eq '') { # ref is start with missing, must extend
                     &append_sarray($old_sarray, $sarray);
                 } else { # to end mut
                     if(defined $toadd_posinref) { # continue extend 战未来
@@ -624,7 +647,7 @@ sub alt_alts_to_muts_notuse {
                         &append_sarray($old_sarray, $sarray);
                         &append_sarray($toadd_sarray_ext, $sarray);
                     } else { # refseq not miss now, to end mut
-                        if($$old_sarray[0] eq '') { # refseq miss since start
+                        if($ eq '') { # refseq miss since start
                             # merge with this mut
                             &append_sarray($old_sarray, $sarray);
                             &append_sarray($toadd_sarray_ext, $sarray);
@@ -667,7 +690,7 @@ sub alt_alts_to_muts_notuse {
     }
     if (@$old_sarray) {
         say STDERR "!!2" .  Dumper $old_sarray;
-        if ( length($$old_sarray[0])==0 ) {
+        if ( length($)==0 ) {
             # 最后一个SV的ref是空的，将序列补到倒数第二个上
             my $last_pos_start = max(keys %muts);
             if (! defined $last_pos_start) {
@@ -705,13 +728,12 @@ sub cal_sarray_mut_spectrum {
 
 sub cal_sarray_is_compatible {
     my ($sarray1, $sarray2) = @_;
+    if ($FAST_HELPERS_ENABLED) {
+        return realign_alts_fast::cal_sarray_is_compatible_fast($sarray1, $sarray2);
+    }
     my $spectrum1 = &cal_sarray_mut_spectrum($sarray1);
     my $spectrum2 = &cal_sarray_mut_spectrum($sarray2);
-    if ($spectrum1 eq $spectrum2) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return $spectrum1 eq $spectrum2 ? 1 : 0;
 }
 
 
@@ -736,6 +758,19 @@ sub append_sarray {
         }
         return;
     }
+}
+
+sub clone_sarray_perl {
+    my ($sarray) = @_;
+    my @copy;
+    foreach my $item (@$sarray) {
+        if (defined $item) {
+            push @copy, "$item";
+        } else {
+            push @copy, undef;
+        }
+    }
+    return \@copy;
 }
 
 sub append_sarray_new {
@@ -768,15 +803,15 @@ sub append_sarray_new {
 
 sub get_sarray {
     # sarray{ialt} = seq
-    my ($tie_seqs, $i, $max_alts, $no_sub_miss) = @_;
+    my ($seqs, $i, $max_alts, $no_sub_miss) = @_;
     $no_sub_miss //= 0;
     my @sarray;
     foreach my $ialt (0..$max_alts) {
-        my $seq = $$tie_seqs[$ialt][$i];
+        my $seq = substr($seqs->[$ialt], $i, 1);
         if ($no_sub_miss==0) {
-            $seq='' if $seq eq '-';
+            $seq='' if defined $seq && $seq eq '-';
         }
-        @sarray[$ialt] = $seq;
+        $sarray[$ialt] = $seq;
     }
     return \@sarray;
 }
@@ -787,28 +822,21 @@ sub sarray_is_same_miss {
     unless (defined $max_alts) {
         $max_alts = scalar(@$sarray) - 1;
     }
-    my $first = $$sarray[0];
-
-    my $is_ref_miss=0;
-    if ($first eq '-' or $first eq '') {
-        $is_ref_miss=1;
+    if ($FAST_HELPERS_ENABLED) {
+        return realign_alts_fast::sarray_is_same_miss_fast($sarray, $max_alts);
     }
+    my $first = $sarray->[0];
+
+    my $is_ref_miss = ($first eq '-' or $first eq '') ? 1 : 0;
     my %seqs;
-    for(my $i = 0; $i<= $max_alts; $i++) {
-        my $seq = $$sarray[$i];
+    for (my $i = 0; $i <= $max_alts; $i++) {
+        my $seq = $sarray->[$i];
         $seqs{$seq}++;
     }
-    my $is_miss = 0;
-    if (exists $seqs{'-'} or exists $seqs{''}) {
-        $is_miss=1;
-        #delete $seqs{'-'};
-    }
-    my $is_same = scalar(keys %seqs)>1 ? 0 : 1 ;
-    #die Dumper \%seqs;
+    my $is_miss = (exists $seqs{'-'} or exists $seqs{''}) ? 1 : 0;
+    my $is_same = scalar(keys %seqs) > 1 ? 0 : 1;
     return ($is_same, $is_miss, $is_ref_miss);
 }
-
-
 
 sub sarray_diff_array {
     my ($sarray1, $sarray2) = @_; # sarray1 is old_array may contain multiple chrs
