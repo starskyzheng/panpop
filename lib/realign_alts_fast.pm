@@ -15,134 +15,214 @@ our @EXPORT_OK = qw(
 use Inline ( C => Config => CLEAN_AFTER_BUILD => 0 );
 use Inline C => <<'END_C';
 #include <string.h>
+#include <stdlib.h>
 
-static int is_missing(const char* str, STRLEN len) {
-    return (len == 0) || (len == 1 && str[0] == '-');
+typedef struct {
+    size_t count;
+    const char **items;
+    STRLEN *lens;
+    unsigned char *defined;
+} SArray;
+
+static void sarray_init(SArray *arr) {
+    arr->count = 0;
+    arr->items = NULL;
+    arr->lens = NULL;
+    arr->defined = NULL;
 }
 
-void sarray_is_same_miss_fast(SV* sarray_ref, IV max_alts) {
-    Inline_Stack_Void;
-    if (!SvROK(sarray_ref) || SvTYPE(SvRV(sarray_ref)) != SVt_PVAV) {
-        croak("sarray_is_same_miss_fast expects an array reference");
+static void sarray_free(SArray *arr) {
+    if (arr->items) {
+        free((void *)arr->items);
     }
-    AV* sarray = (AV*)SvRV(sarray_ref);
-    SSize_t last_index = (max_alts >= 0) ? max_alts : av_len(sarray);
-    if (last_index < 0) {
-        Inline_Stack_Push(sv_2mortal(newSViv(1)));
-        Inline_Stack_Push(sv_2mortal(newSViv(0)));
-        Inline_Stack_Push(sv_2mortal(newSViv(0)));
-        Inline_Stack_Done;
+    if (arr->lens) {
+        free((void *)arr->lens);
+    }
+    if (arr->defined) {
+        free((void *)arr->defined);
+    }
+    sarray_init(arr);
+}
+
+static void sarray_from_av(SV *sarray_ref, SArray *arr, IV max_alts) {
+    sarray_init(arr);
+    if (!SvROK(sarray_ref) || SvTYPE(SvRV(sarray_ref)) != SVt_PVAV) {
+        croak("expected array reference");
+    }
+    AV *av = (AV *)SvRV(sarray_ref);
+    SSize_t highest = av_len(av);
+    if (highest < 0) {
+        arr->count = 0;
         return;
     }
-    SV** elem = av_fetch(sarray, 0, 0);
-    if (!elem) {
-        croak("sarray_is_same_miss_fast: missing element 0");
+    size_t total = (size_t)highest + 1;
+    if (max_alts >= 0 && (size_t)(max_alts + 1) < total) {
+        total = (size_t)max_alts + 1;
     }
-    STRLEN first_len = 0;
-    const char* first_ptr = SvPVbyte(*elem, first_len);
-    int is_ref_miss = is_missing(first_ptr, first_len);
-    int is_miss = is_ref_miss;
-    int is_same = 1;
-    for (SSize_t i = 1; i <= last_index; i++) {
-        elem = av_fetch(sarray, i, 0);
+    arr->count = total;
+    arr->items = (const char **)malloc(total * sizeof(const char *));
+    arr->lens = (STRLEN *)malloc(total * sizeof(STRLEN));
+    arr->defined = (unsigned char *)malloc(total * sizeof(unsigned char));
+    if (!arr->items || !arr->lens || !arr->defined) {
+        sarray_free(arr);
+        croak("memory allocation failed");
+    }
+    for (size_t i = 0; i < total; ++i) {
+        SV **elem = av_fetch(av, (SSize_t)i, 0);
         if (!elem) {
-            croak("sarray_is_same_miss_fast: missing element");
+            sarray_free(arr);
+            croak("missing element when materialising sarray");
         }
-        STRLEN len = 0;
-        const char* ptr = SvPVbyte(*elem, len);
-        if (is_missing(ptr, len)) {
-            is_miss = 1;
+        if (!SvOK(*elem)) {
+            arr->defined[i] = 0;
+            arr->items[i] = "";
+            arr->lens[i] = 0;
+        } else {
+            arr->defined[i] = 1;
+            arr->items[i] = SvPVbyte(*elem, arr->lens[i]);
         }
-        if (is_same) {
-            if (len != first_len) {
-                is_same = 0;
-            } else if (len > 0 && memcmp(ptr, first_ptr, len) != 0) {
+    }
+}
+
+static int is_missing_value(const SArray *arr, size_t idx) {
+    if (!arr->defined[idx]) {
+        return 1;
+    }
+    STRLEN len = arr->lens[idx];
+    if (len == 0) {
+        return 1;
+    }
+    if (len == 1 && arr->items[idx][0] == '-') {
+        return 1;
+    }
+    return 0;
+}
+
+static int values_equal(const SArray *arr, size_t a, size_t b) {
+    if (arr->defined[a] != arr->defined[b]) {
+        return 0;
+    }
+    if (arr->lens[a] != arr->lens[b]) {
+        return 0;
+    }
+    if (arr->lens[a] == 0) {
+        return 1;
+    }
+    return memcmp(arr->items[a], arr->items[b], arr->lens[a]) == 0;
+}
+
+static void build_pattern(const SArray *arr, int *pattern) {
+    int next_id = 0;
+    for (size_t i = 0; i < arr->count; ++i) {
+        int id = -1;
+        for (size_t j = 0; j < i; ++j) {
+            if (values_equal(arr, i, j)) {
+                id = pattern[j];
+                break;
+            }
+        }
+        if (id == -1) {
+            id = next_id++;
+        }
+        pattern[i] = id;
+    }
+}
+
+void sarray_is_same_miss_fast(SV *sarray_ref, IV max_alts) {
+    Inline_Stack_Void;
+    SArray arr;
+    sarray_from_av(sarray_ref, &arr, max_alts);
+
+    int is_same = 1;
+    int is_miss = 0;
+    int is_ref_miss = 0;
+
+    if (arr.count == 0) {
+        is_same = 1;
+        is_miss = 0;
+        is_ref_miss = 0;
+    } else {
+        is_ref_miss = is_missing_value(&arr, 0);
+        is_miss = is_ref_miss;
+        for (size_t i = 1; i < arr.count; ++i) {
+            if (is_missing_value(&arr, i)) {
+                is_miss = 1;
+            }
+            if (is_same && !values_equal(&arr, 0, i)) {
                 is_same = 0;
             }
         }
     }
+
+    sarray_free(&arr);
+
     Inline_Stack_Push(sv_2mortal(newSViv(is_same)));
     Inline_Stack_Push(sv_2mortal(newSViv(is_miss)));
     Inline_Stack_Push(sv_2mortal(newSViv(is_ref_miss)));
     Inline_Stack_Done;
 }
 
-SV* clone_sarray_fast(SV* sarray_ref) {
-    if (!SvROK(sarray_ref) || SvTYPE(SvRV(sarray_ref)) != SVt_PVAV) {
-        croak("clone_sarray_fast expects an array reference");
-    }
-    AV* source = (AV*)SvRV(sarray_ref);
-    AV* copy = newAV();
-    SSize_t last = av_len(source);
-    for (SSize_t i = 0; i <= last; i++) {
-        SV** elem = av_fetch(source, i, 0);
-        SV* value;
-        if (!elem || !SvOK(*elem)) {
-            value = newSV(0);
-        } else {
-            STRLEN len = 0;
-            const char* ptr = SvPVbyte(*elem, len);
-            value = newSVpvn(ptr, len);
+SV *clone_sarray_fast(SV *sarray_ref) {
+    SArray arr;
+    sarray_from_av(sarray_ref, &arr, -1);
+
+    AV *copy = newAV();
+    if (arr.count > 0) {
+        av_extend(copy, (SSize_t)arr.count - 1);
+        for (size_t i = 0; i < arr.count; ++i) {
+            SV *value;
+            if (!arr.defined[i]) {
+                value = newSV(0);
+            } else {
+                value = newSVpvn(arr.items[i], arr.lens[i]);
+            }
+            av_store(copy, (SSize_t)i, value);
         }
-        av_push(copy, value);
     }
-    return newRV_noinc((SV*)copy);
+
+    sarray_free(&arr);
+    return newRV_noinc((SV *)copy);
 }
 
-IV cal_sarray_is_compatible_fast(SV* sarray1_ref, SV* sarray2_ref) {
-    if (!SvROK(sarray1_ref) || SvTYPE(SvRV(sarray1_ref)) != SVt_PVAV) {
-        croak("cal_sarray_is_compatible_fast expects array references");
-    }
-    if (!SvROK(sarray2_ref) || SvTYPE(SvRV(sarray2_ref)) != SVt_PVAV) {
-        croak("cal_sarray_is_compatible_fast expects array references");
-    }
-    AV* arr1 = (AV*)SvRV(sarray1_ref);
-    AV* arr2 = (AV*)SvRV(sarray2_ref);
-    SSize_t len1 = av_len(arr1);
-    SSize_t len2 = av_len(arr2);
-    if (len1 != len2) {
-        return 0;
-    }
-    HV* map1 = newHV();
-    HV* map2 = newHV();
-    IV next1 = 0;
-    IV next2 = 0;
-    int result = 1;
-    for (SSize_t i = 0; i <= len1; i++) {
-        SV** elem1 = av_fetch(arr1, i, 0);
-        SV** elem2 = av_fetch(arr2, i, 0);
-        if (!elem1 || !elem2) {
-            result = 0;
-            break;
-        }
-        STRLEN len_a = 0;
-        const char* str_a = SvPVbyte(*elem1, len_a);
-        STRLEN len_b = 0;
-        const char* str_b = SvPVbyte(*elem2, len_b);
+IV cal_sarray_is_compatible_fast(SV *sarray1_ref, SV *sarray2_ref) {
+    SArray arr1;
+    SArray arr2;
+    sarray_from_av(sarray1_ref, &arr1, -1);
+    sarray_from_av(sarray2_ref, &arr2, -1);
 
-        HE* he1 = hv_fetch(map1, str_a, (I32)len_a, 0);
-        HE* he2 = hv_fetch(map2, str_b, (I32)len_b, 0);
-        IV idx1;
-        IV idx2;
-        if (he1) {
-            idx1 = SvIV(HeVAL(he1));
-        } else {
-            idx1 = next1++;
-            hv_store(map1, str_a, (I32)len_a, newSViv(idx1), 0);
+    IV result = 1;
+
+    if (arr1.count != arr2.count) {
+        result = 0;
+    } else if (arr1.count > 0) {
+        size_t n = arr1.count;
+        int *pattern1 = (int *)malloc(n * sizeof(int));
+        int *pattern2 = (int *)malloc(n * sizeof(int));
+        if (!pattern1 || !pattern2) {
+            if (pattern1) {
+                free(pattern1);
+            }
+            if (pattern2) {
+                free(pattern2);
+            }
+            sarray_free(&arr1);
+            sarray_free(&arr2);
+            croak("memory allocation failed");
         }
-        if (he2) {
-            idx2 = SvIV(HeVAL(he2));
-        } else {
-            idx2 = next2++;
-            hv_store(map2, str_b, (I32)len_b, newSViv(idx2), 0);
+        build_pattern(&arr1, pattern1);
+        build_pattern(&arr2, pattern2);
+        for (size_t i = 0; i < n; ++i) {
+            if (pattern1[i] != pattern2[i]) {
+                result = 0;
+                break;
+            }
         }
-        if (idx1 != idx2) {
-            result = 0;
-            break;
-        }
+        free(pattern1);
+        free(pattern2);
     }
-    SvREFCNT_dec((SV*)map1);
-    SvREFCNT_dec((SV*)map2);
+
+    sarray_free(&arr1);
+    sarray_free(&arr2);
     return result;
 }
 END_C
